@@ -1,0 +1,10 @@
+./idea
+./vscode
+./log
+./build
+./install
+*/__pycache__
+./ros_docker
+./scripts
+Dockerfile
+docker-compose.yml

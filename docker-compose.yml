@@ -2,7 +2,7 @@ version: '3.1'
 
 services:
   camera:
-    image: public.ecr.aws/paia-tech/pros-camera:latest
+    image: public.ecr.aws/paia-tech/your_package:latest
     env_file:
       - .env
     environment:
@@ -13,4 +13,4 @@ services:
     devices:
       - /dev/video0:/dev/video0
       - /dev/video1:/dev/video1
-    command: ros2 launch astra_camera astro_pro_plus.launch.xml
+    command: ros2 launch your_package

@@ -3,7 +3,9 @@ FROM public.ecr.aws/paia-tech/ros2-humble:dev
 ENV ROS2_WS /workspaces
 ENV ROS_DOMAIN_ID=1
 
-RUN pip3 install -r requirements.txt
+COPY ./requirements.txt /tmp
+RUN pip3 install -r /tmp/requirements.txt
+
 # TODO install dependencies 
 # RUN apt install -y packages_to_install
 

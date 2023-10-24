@@ -16,6 +16,7 @@ RUN . /opt/ros/humble/setup.sh && colcon build --event-handlers console_direct+ 
 # You could decide wheather to delete source code
 
 RUN echo "source ${ROS2_WS}/install/setup.bash " >> /.bashrc 
+RUN echo "source /.bashrc  " >> ~/.bashrc 
 
 COPY ros_entrypoint.bash /ros_entrypoint.bash
 RUN chmod +x /ros_entrypoint.bash

@@ -7,7 +7,7 @@ from serial import Serial
 from .env import SERIAL_DEV_DEFAULT
 from rclpy.node import Node
 import rclpy
-from .car_models import CarAControlSignal, CarAState
+from .car_models import TwoWheelAndServoControlSignal, TwoWheelAndServoState
 from rclpy.duration import Duration
 import random
 
@@ -39,7 +39,7 @@ class CarARandomController(Node):
             if current_time - self.last_log_time >= self.log_interval:
                 try:
                     state_data = json.loads(incoming_data.decode().strip())
-                    car_state = CarAState(**state_data)
+                    car_state = TwoWheelAndServoState(**state_data)
                     self.get_logger().info(f"Received state: {car_state.json()}")
                 except (json.JSONDecodeError, PydanticValueError) as e:
                     self.get_logger().error(f"Failed to decode state data: {e}")
@@ -57,7 +57,7 @@ class CarARandomController(Node):
         # This function generates a random command to send to the ESP32
         random_velocity = [random.uniform(-10, 10) for _ in range(2)]
         random_direction = random.randint(70, 110)
-        control_signal = CarAControlSignal(target_vel=random_velocity, direction=random_direction)
+        control_signal = TwoWheelAndServoControlSignal(target_vel=random_velocity, direction=random_direction)
         return control_signal
 
 def main(args=None):

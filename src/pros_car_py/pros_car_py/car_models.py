@@ -1,19 +1,19 @@
 from typing import List
 import pydantic
 
-class CarAControlSignal(pydantic.BaseModel):
+class TwoWheelAndServoControlSignal(pydantic.BaseModel):
     target_vel:List[float]=[]
     direction:int=None
 
-class CarAState(pydantic.BaseModel):
+class TwoWheelAndServoState(pydantic.BaseModel):
     motor_count:int=2
     vels:List[float]=[]
     encoders:List [int]=[]
     direction:int
 
-class CarBControlSignal(pydantic.BaseModel):
+class TwoWheelControlSignal(pydantic.BaseModel):
     target_vel:List[float]=[]
-class CarBState(pydantic.BaseModel):
+class TwoWheelState(pydantic.BaseModel):
     motor_count:int=2
     vels:List[float]=[]
     encoders:List [int]=[]

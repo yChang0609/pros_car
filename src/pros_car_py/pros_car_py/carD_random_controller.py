@@ -11,7 +11,7 @@ from rclpy.duration import Duration
 import random
 
 
-class CarBRandomController(Node):
+class CarDRandomController(Node):
     def __init__(self):
         super().__init__('carA_random_controller')
 
@@ -68,7 +68,7 @@ class CarBRandomController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    serial_writer = CarBRandomController()
+    serial_writer = CarDRandomController()
     rclpy.spin(serial_writer)
 
     serial_writer.destroy_node()

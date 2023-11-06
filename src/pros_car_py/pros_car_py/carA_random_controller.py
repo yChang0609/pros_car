@@ -9,6 +9,7 @@ from rclpy.node import Node
 import rclpy
 from .car_models import CarAControlSignal, CarAState
 from rclpy.duration import Duration
+import random
 
 
 class CarARandomController(Node):
@@ -54,7 +55,6 @@ class CarARandomController(Node):
 
     def _generate_random_command(self):
         # This function generates a random command to send to the ESP32
-        import random
         random_velocity = [random.uniform(-10, 10) for _ in range(2)]
         random_direction = random.randint(70, 110)
         control_signal = CarAControlSignal(target_vel=random_velocity, direction=random_direction)

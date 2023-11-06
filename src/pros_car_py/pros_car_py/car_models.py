@@ -10,3 +10,11 @@ class CarAState(pydantic.BaseModel):
     vels:List[float]=[]
     encoders:List [int]=[]
     direction:int
+
+class CarBControlSignal(pydantic.BaseModel):
+    target_vel:List[float]=[]
+class CarBState(pydantic.BaseModel):
+    motor_count:int=2
+    vels:List[float]=[]
+    encoders:List [int]=[]
+    

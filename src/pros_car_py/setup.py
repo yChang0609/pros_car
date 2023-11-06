@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'carA_writer = pros_car_py.carA_writer:main'
+            'carA_random = pros_car_py.carA_random_controller:main'
         ],
     },
 )

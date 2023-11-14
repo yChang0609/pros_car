@@ -25,48 +25,67 @@ class CarARandomController(Node):
 
         # Create a timer to send data to ESP32 every 2000 milliseconds (2 second)
         self.write_timer = self.create_timer(5.0, self.send_to_esp32_callback)
-        self.last_log_time = self.get_clock().now()
         self.log_interval = Duration(seconds=1)  # Log every 1 seconds
 
+import rclpy
+from rclpy.node import Node
+import orjson
+from std_msgs.msg import String
+import random
 
-    def read_from_esp32_callback(self):
-        # This function is called to read data from the ESP32
-        if self._serial.in_waiting:
-            incoming_data = self._serial.readline()
-            # Deserialize the JSON string to CarAState object
-            # log data in a duration
-            current_time = self.get_clock().now()
-            if current_time - self.last_log_time >= self.log_interval:
-                try:
-                    state_data = json.loads(incoming_data.decode().strip())
-                    car_state = TwoWheelAndServoState(**state_data)
-                    self.get_logger().info(f"Received state: {car_state.json()}")
-                except (json.JSONDecodeError, PydanticValueError) as e:
-                    self.get_logger().error(f"Failed to decode state data: {e}")
-                self.last_log_time = current_time
+class CarARandomAI(Node):
+    def __init__(self):
+        super().__init__('car_a_random_ai')
 
-    def send_to_esp32_callback(self):
-        # This function is called every 1 second to send data to the ESP32
-        command = self._generate_random_command()
-        command_str = command.json()
-        self._serial.write(command_str.encode('utf-8'))
-        # Log the sent command for debugging purposes
-        self.get_logger().info(f"Sent command: {command_str}")
+        # Subscriber
+        self.subscription = self.create_subscription(
+            String,
+            'carA_state',
+            self._sub_callback,
+            10
+        )
+        self.subscription  # prevent unused variable warning
 
-    def _generate_random_command(self):
-        # This function generates a random command to send to the ESP32
-        random_velocity = [random.uniform(-10, 10) for _ in range(2)]
-        random_direction = random.randint(70, 110)
-        control_signal = TwoWheelAndServoControlSignal(target_vel=random_velocity, direction=random_direction)
-        return control_signal
+        # Publisher
+        self.publisher = self.create_publisher(
+            String,
+            'carA_control',
+            10
+        )
+        self.pub_timer = self.create_timer(2, self._pub_callback)
+
+        self.log_interval = Duration(seconds=1)  # Log every 1 seconds
+
+    def _sub_callback(self, msg):
+        # Process the incoming message (if needed)
+        self.get_logger().info(f"Received state: {msg.data}")
+
+    def _pub_callback(self):
+        # Generate a random control signal
+        control_signal = {
+            "type": "carA_control",
+            "data":TwoWheelAndServoControlSignal(
+                    direction=random.randint(70, 110),
+                    target_vel= [random.uniform(-20, 20), random.uniform(-20,20)]
+                )
+        }
+        # Convert the control signal to a JSON string
+        control_msg = String()
+        control_msg.data = orjson.dumps(control_signal).decode()
+
+        # Publish the control signal
+        self.publisher.publish(control_msg)
+        self.get_logger().info(f"Published control signal: {control_msg.data}")
 
 def main(args=None):
     rclpy.init(args=args)
-    serial_writer = CarARandomController()
-    rclpy.spin(serial_writer)
-
-    serial_writer.destroy_node()
+    car_a_random_ai = CarARandomAI()
+    rclpy.spin(car_a_random_ai)
+    car_a_random_ai.destroy_node()
     rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
 
 if __name__ == '__main__':
     main()

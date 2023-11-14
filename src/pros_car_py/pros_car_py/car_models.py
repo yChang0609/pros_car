@@ -2,9 +2,6 @@ from enum import Enum, auto
 from typing import List
 import pydantic
 
-CARA_CONTROL = 'CarA_Control'
-
-
 class StringEnum(str, Enum):
     def _generate_next_value_(name, start, count, last_values):
         return name

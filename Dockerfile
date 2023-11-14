@@ -5,6 +5,7 @@ ENV ROS_DOMAIN_ID=1
 
 COPY ./requirements.txt /tmp
 RUN pip3 install -r /tmp/requirements.txt
+RUN apt-get update && apt-get install libncurses5-dev libncursesw5-dev -y
 
 # TODO install dependencies 
 # RUN apt install -y packages_to_install

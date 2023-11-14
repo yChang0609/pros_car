@@ -1,5 +1,5 @@
 from pros_car_py.env import SERIAL_DEV_DEFAULT
-from pros_car_py.car_models import CARA_CONTROL, TwoWheelAndServoControlSignal
+from pros_car_py.car_models import *
 import rclpy
 from rclpy.node import Node
 import orjson
@@ -11,7 +11,7 @@ class CarAControlSubscriber(Node):
         super().__init__('car_a_control_subscriber')
         self.subscription = self.create_subscription(
             String,
-            'carA_control', # topic name
+            DeviceDataTypeEnum.car_A_control, # topic name
             self.listener_callback,
             10
         )
@@ -24,22 +24,23 @@ class CarAControlSubscriber(Node):
     def listener_callback(self, msg):
         try:
             control_data = orjson.loads(msg.data)
-            
-            if control_data.get('type') == CARA_CONTROL:
-                self.process_control_data(control_data.get('data', {}))
+            # TODO use more clear method to write
+            # TODO divide serial data and data validation
+            if control_data.get('type') == DeviceDataTypeEnum.car_A_control:
+                self.process_control_data(CarAControl,control_data.get('data', {}))
         except orjson.JSONDecodeError as e:
             self.get_logger().error('JSON decode error: {}'.format(e))
         except KeyError as e:
             self.get_logger().error('Missing key in JSON data: {}'.format(e))
 
-    def process_control_data(self, data):
+    def process_control_data(self,type_cls, data:dict):
         # Process the control data as needed
         # direction = data.get('direction')
         # target_vel = data.get('target_vel')
         # TODO should be customized
-        control_signal = TwoWheelAndServoControlSignal(**orjson.loads(data))
+        control_signal = type_cls(**data)
 
-        self._serial.write(orjson.dumps(control_signal.json(),option=orjson.OPT_APPEND_NEWLINE))
+        self._serial.write(orjson.dumps(dict(control_signal),option=orjson.OPT_APPEND_NEWLINE))
         # self.get_logger().info(f'Received type:{type(data)} data: {data}')
         self.get_logger().info(f'Received {control_signal}')
 

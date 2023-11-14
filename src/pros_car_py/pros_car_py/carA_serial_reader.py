@@ -1,7 +1,5 @@
 from pros_car_py.env import SERIAL_DEV_DEFAULT
-from .car_models import *
-# from .car_models import DeviceDataTypeEnum
-# from pros_car_py.car_models import DeviceDataTypeEnum
+from pros_car_py.car_models import *
 import rclpy
 from rclpy.node import Node
 import orjson

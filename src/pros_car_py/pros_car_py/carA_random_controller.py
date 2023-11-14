@@ -1,13 +1,8 @@
 
-from pydantic import PydanticValueError
-from geometry_msgs.msg import Twist
-from serial import Serial
-from .env import SERIAL_DEV_DEFAULT
 from rclpy.node import Node
 import rclpy
-from .car_models import CARA_CONTROL, TwoWheelAndServoControlSignal, TwoWheelAndServoState
+from pros_car_py.car_models import *
 from rclpy.duration import Duration
-
 import orjson
 from std_msgs.msg import String
 import random
@@ -19,7 +14,7 @@ class CarARandomAI(Node):
         # Subscriber
         self.subscription = self.create_subscription(
             String,
-            'carA_state',
+            DeviceDataTypeEnum.car_A_state,
             self._sub_callback,
             10
         )
@@ -28,7 +23,7 @@ class CarARandomAI(Node):
         # Publisher
         self.publisher = self.create_publisher(
             String,
-            'carA_control',# topic name
+            DeviceDataTypeEnum.car_A_control,# topic name
             10
         )
         self.pub_timer = self.create_timer(2, self._pub_callback)
@@ -46,11 +41,11 @@ class CarARandomAI(Node):
     def _pub_callback(self):
         # Generate a random control signal
         control_signal = {
-            "type": CARA_CONTROL,
-            "data":TwoWheelAndServoControlSignal(
+            "type": str(DeviceDataTypeEnum.car_A_control),
+            "data":dict(CarAControl(
                     direction=random.randint(70, 110),
                     target_vel= [random.uniform(-20, 20), random.uniform(-20,20)]
-                ).json()
+                ))
         }
         # Convert the control signal to a JSON string
         control_msg = String()

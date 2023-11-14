@@ -1,6 +1,7 @@
 from typing import List
 import pydantic
 
+CARA_CONTROL = 'CarA_Control'
 class TwoWheelAndServoControlSignal(pydantic.BaseModel):
     target_vel:List[float]=[]
     direction:int=None

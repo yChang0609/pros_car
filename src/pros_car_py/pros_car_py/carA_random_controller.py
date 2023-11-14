@@ -1,34 +1,13 @@
 
-import json
-
 from pydantic import PydanticValueError
 from geometry_msgs.msg import Twist
 from serial import Serial
 from .env import SERIAL_DEV_DEFAULT
 from rclpy.node import Node
 import rclpy
-from .car_models import TwoWheelAndServoControlSignal, TwoWheelAndServoState
+from .car_models import CARA_CONTROL, TwoWheelAndServoControlSignal, TwoWheelAndServoState
 from rclpy.duration import Duration
-import random
 
-
-class CarARandomController(Node):
-    def __init__(self):
-        super().__init__('carA_random_controller')
-
-        # Set up the serial connection
-        serial_port = self.declare_parameter('serial_port', SERIAL_DEV_DEFAULT).value
-        self._serial = Serial(serial_port, 115200, timeout=0)
-
-        # Create a timer to read data from ESP32 every 0.01 milliseconds (0.01 seconds)
-        self.read_timer = self.create_timer(0.01, self.read_from_esp32_callback)
-
-        # Create a timer to send data to ESP32 every 2000 milliseconds (2 second)
-        self.write_timer = self.create_timer(5.0, self.send_to_esp32_callback)
-        self.log_interval = Duration(seconds=1)  # Log every 1 seconds
-
-import rclpy
-from rclpy.node import Node
 import orjson
 from std_msgs.msg import String
 import random
@@ -49,25 +28,29 @@ class CarARandomAI(Node):
         # Publisher
         self.publisher = self.create_publisher(
             String,
-            'carA_control',
+            'carA_control',# topic name
             10
         )
         self.pub_timer = self.create_timer(2, self._pub_callback)
 
-        self.log_interval = Duration(seconds=1)  # Log every 1 seconds
+        self.log_interval = Duration(seconds=1)  # Log every 1 second
+        self.last_log_time = self.get_clock().now()
 
     def _sub_callback(self, msg):
         # Process the incoming message (if needed)
-        self.get_logger().info(f"Received state: {msg.data}")
+        current_time = self.get_clock().now()
+        if current_time - self.last_log_time >= self.log_interval:
+            self.get_logger().info(f'receive msg {msg}')
+            self.last_log_time = current_time
 
     def _pub_callback(self):
         # Generate a random control signal
         control_signal = {
-            "type": "carA_control",
+            "type": CARA_CONTROL,
             "data":TwoWheelAndServoControlSignal(
                     direction=random.randint(70, 110),
                     target_vel= [random.uniform(-20, 20), random.uniform(-20,20)]
-                )
+                ).json()
         }
         # Convert the control signal to a JSON string
         control_msg = String()
@@ -75,8 +58,8 @@ class CarARandomAI(Node):
 
         # Publish the control signal
         self.publisher.publish(control_msg)
-        self.get_logger().info(f"Published control signal: {control_msg.data}")
 
+        self.get_logger().info(f'publish {control_msg}')
 def main(args=None):
     rclpy.init(args=args)
     car_a_random_ai = CarARandomAI()

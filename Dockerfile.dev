@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install libncurses5-dev libncursesw5-dev -y
 # RUN apt install -y packages_to_install
 
 # Build your ROS packages
-COPY ./src ${ROS2_WS}/src
+COPY ./src ${ROS2_WS}
 WORKDIR ${ROS2_WS}
 RUN . /opt/ros/humble/setup.sh && colcon build --event-handlers console_direct+ --cmake-args -DCMAKE_BUILD_TYPE=Release
 # You could decide wheather to delete source code

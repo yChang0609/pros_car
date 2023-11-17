@@ -24,13 +24,6 @@ def generate_launch_description():
             name='carA_writer_node',
             parameters=[{'serial_port': LaunchConfiguration('serial_port')}],
             output='screen'
-        ),
-        Node(
-            package='pros_car_py',  # Replace with your package name
-            executable='carA_random',
-            name='carA_random_node',
-            parameters=[{'serial_port': LaunchConfiguration('serial_port')}],
-            output='screen'
         )
         
     ])

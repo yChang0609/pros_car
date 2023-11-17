@@ -1,4 +1,4 @@
-from pros_car_py.env import SERIAL_DEV_DEFAULT
+from pros_car_py.env import SERIAL_DEV_DEFAULT, SERIAL_DEV_FORWARD_DEFAULT
 from pros_car_py.env import SERIAL_DEV_FORWARD_DEFAULT
 from pros_car_py.car_models import *
 import rclpy
@@ -28,7 +28,7 @@ class CarAControlSubscriber(Node):
             self.listener_callback_forward,
             10
         )
-        serial_port_forward = self.declare_parameter('serial_port', SERIAL_DEV_FORWARD_DEFAULT).value
+        serial_port_forward = self.declare_parameter('serial_port_2', SERIAL_DEV_FORWARD_DEFAULT).value
 
         self.subscription_forward  # prevent unused variable warning
         self._serial_forward = Serial(serial_port_forward, 115200, timeout=0)

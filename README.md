@@ -1,5 +1,27 @@
 # PROS-Boilerplate
 
+Authors:
+
+- 陳麒麟
+- 曾裕祥
+- 林庭琮
+- 鍾博丞
+
+Advising professor:
+
+- 蘇文鈺
+
+
+
+## Car Type
+
+| Type | Description                            |
+| ---- | -------------------------------------- |
+| A    | Rear-wheel drive, front-wheel steering |
+| B    | Rear-wheel drive                       |
+| C    | Four-wheel drive                       |
+| D    | Mecanum wheel                          |
+
 
 
 ## Getting started

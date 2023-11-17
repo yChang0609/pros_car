@@ -1,4 +1,3 @@
-
 from rclpy.node import Node
 import rclpy
 from pros_car_py.car_models import *
@@ -6,6 +5,7 @@ from rclpy.duration import Duration
 import orjson
 from std_msgs.msg import String
 import random
+
 
 class CarARandomAI(Node):
     def __init__(self):
@@ -23,7 +23,7 @@ class CarARandomAI(Node):
         # Publisher
         self.publisher = self.create_publisher(
             String,
-            DeviceDataTypeEnum.car_A_control,# topic name
+            DeviceDataTypeEnum.car_A_control,  # topic name
             10
         )
         self.pub_timer = self.create_timer(2, self._pub_callback)
@@ -42,10 +42,10 @@ class CarARandomAI(Node):
         # Generate a random control signal
         control_signal = {
             "type": str(DeviceDataTypeEnum.car_A_control),
-            "data":dict(CarAControl(
-                    direction=random.randint(70, 110),
-                    target_vel= [random.uniform(-20, 20), random.uniform(-20,20)]
-                ))
+            "data": dict(CarAControl(
+                direction=random.randint(70, 110),
+                target_vel=[random.uniform(-20, 20), random.uniform(-20, 20)]
+            ))
         }
         # Convert the control signal to a JSON string
         control_msg = String()
@@ -55,6 +55,8 @@ class CarARandomAI(Node):
         self.publisher.publish(control_msg)
 
         self.get_logger().info(f'publish {control_msg}')
+
+
 def main(args=None):
     rclpy.init(args=args)
     car_a_random_ai = CarARandomAI()
@@ -62,8 +64,6 @@ def main(args=None):
     car_a_random_ai.destroy_node()
     rclpy.shutdown()
 
-if __name__ == '__main__':
-    main()
 
 if __name__ == '__main__':
     main()

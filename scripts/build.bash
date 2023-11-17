@@ -18,4 +18,4 @@ docker tag $IMG_NAME:latest $ECR_URL/$IMG_NAME:$TODAY
 
 # push the image to ECR
 docker push $ECR_URL/$IMG_NAME:latest
-docker push $ECR_URL/$IMG_NAME:$TODAY 
+docker push $ECR_URL/$IMG_NAME:$TODAY

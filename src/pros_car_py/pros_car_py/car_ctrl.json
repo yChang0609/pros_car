@@ -1,7 +1,10 @@
 {
-    "type":"carA_control",
-    "data":{
-        "direction":90,
-        "target_vel":[10,20]
-    }
+  "type": "carA_control",
+  "data": {
+    "direction": 90,
+    "target_vel": [
+      10,
+      20
+    ]
+  }
 }

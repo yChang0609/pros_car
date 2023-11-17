@@ -1,14 +1,14 @@
 {
-    "type":"carA_state",
-    "data":{
-        "vels": [
-          10.69518757,
-          9.8039217
-        ],
-        "encoders": [
-          6269,
-          5563
-        ],
-        "direction": 112
-      }
+  "type": "carA_state",
+  "data": {
+    "vels": [
+      10.69518757,
+      9.8039217
+    ],
+    "encoders": [
+      6269,
+      5563
+    ],
+    "direction": 112
+  }
 }

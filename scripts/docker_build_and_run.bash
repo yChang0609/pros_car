@@ -17,4 +17,4 @@ docker run \
 
 # push the image to ECR
 # docker push $ECR_URL/$IMG_NAME:latest
-# docker push $ECR_URL/$IMG_NAME:$TODAY 
+# docker push $ECR_URL/$IMG_NAME:$TODAY

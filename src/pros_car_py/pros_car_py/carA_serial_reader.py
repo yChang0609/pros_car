@@ -7,6 +7,7 @@ from std_msgs.msg import String
 from serial import Serial
 from rclpy.duration import Duration
 
+
 class CarASerialReader(Node):
     def __init__(self):
         super().__init__('car_a_serial_reader')
@@ -27,26 +28,27 @@ class CarASerialReader(Node):
         self.last_log_time = current_time
 
     def timer_callback(self):
-        if self._serial.in_waiting:
+        if self._serial.in_waiting > 0:
             incoming_data = self._serial.readline()
             current_time = self.get_clock().now()
-            if current_time - self.last_log_time >= self.log_interval:    
+            if current_time - self.last_log_time >= self.log_interval:
                 self.get_logger().info(f'Receive from car esp32: {incoming_data}')
                 self.last_log_time = current_time
 
             try:
                 # Assuming the incoming data is already in the required JSON format
-                
+
                 state_msg = String()
                 # validation should be customized
-                state_data =dict(CarAState(**orjson.loads(incoming_data)))
+                state_data = dict(CarAState(**orjson.loads(incoming_data)))
                 state_msg.data = orjson.dumps(
                     dict(DeviceData(type=DeviceDataTypeEnum.car_A_state,
-                        data=state_data))
-                    ).decode()
+                                    data=state_data))
+                ).decode()
                 self.publisher.publish(state_msg)
             except orjson.JSONDecodeError as e:
                 self.get_logger().error(f'JSON decode error: {e}')
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -54,6 +56,7 @@ def main(args=None):
     rclpy.spin(car_a_state_publisher)
     car_a_state_publisher.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

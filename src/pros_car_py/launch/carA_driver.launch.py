@@ -3,12 +3,15 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from pros_car_py.env import SERIAL_DEV_DEFAULT
-print("SERIAL_DEV_DEFAULT:",SERIAL_DEV_DEFAULT)
+
+print("SERIAL_DEV_DEFAULT:", SERIAL_DEV_DEFAULT)
+
+
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
-            'serial_port', 
-            default_value=SERIAL_DEV_DEFAULT, 
+            'serial_port',
+            default_value=SERIAL_DEV_DEFAULT,
             description='Serial port for the car nodes'
         ),
         Node(
@@ -25,5 +28,4 @@ def generate_launch_description():
             parameters=[{'serial_port': LaunchConfiguration('serial_port')}],
             output='screen'
         )
-        
     ])

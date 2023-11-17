@@ -178,6 +178,7 @@ class CarAKeyboardController(Node):
 
     def handle_key_a(self):
         # Your action for the 'a' key here
+        self.stdscr.addstr(f"car go forward")
         self._vel = -10  # rad/s
         self._vel2 = 10  # rad/s
         self._vel3 = 10  # rad/s
@@ -195,18 +196,21 @@ class CarAKeyboardController(Node):
         pass
 
     def handle_key_d(self):
+        self.stdscr.addstr(f"car go forward")
         self._vel = 10  # rad/s
         self._vel2 = -10  # rad/s
         self._vel3 = -10  # rad/s
         self._vel4 = 10  # rad/s
         pass
     def handle_key_e(self):
+        self.stdscr.addstr(f"car go forward")
         self._vel = 10  # rad/s
         self._vel2 = -10  # rad/s
         self._vel3 = 10  # rad/s
         self._vel4 = -10  # rad/s
         pass
     def handle_key_r(self):
+        self.stdscr.addstr(f"car go forward")
         self._vel = -10  # rad/s
         self._vel2 = 10  # rad/s
         self._vel3 = -10  # rad/s

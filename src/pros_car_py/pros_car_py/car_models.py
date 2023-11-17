@@ -47,9 +47,8 @@ class CarAState(pydantic.BaseModel):
     direction: int
 
 
-class CarAControl(pydantic.BaseModel):
+class CarDControl(pydantic.BaseModel):
     target_vel: List[float] = []
-    direction: int = 90
 
 
 class TwoWheelAndServoControlSignal(pydantic.BaseModel):

@@ -13,7 +13,7 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 
 class CarAKeyboardController(Node):
     def __init__(self, stdscr):
-        super().__init__('car_A_keyboard')
+        super().__init__('car_D_keyboard')
 
         # Subscriber
         self.subscription = self.create_subscription(
@@ -27,9 +27,15 @@ class CarAKeyboardController(Node):
         # Publisher
         self.publisher = self.create_publisher(
             String,
-            DeviceDataTypeEnum.car_A_control,  # topic name
+            DeviceDataTypeEnum.car_D_control,  # topic name
             10
         )
+        self.publisher_forward = self.create_publisher(
+            String,
+            "test",  # topic name
+            10
+        )
+
         self.joint_trajectory_publisher_ = self.create_publisher(
             JointTrajectoryPoint, 'joint_trajectory_point', 10)
         self.joint_pos = [1.57, 1.57, 1.57, 1.57, 1.0]
@@ -41,7 +47,9 @@ class CarAKeyboardController(Node):
         self._car_state_msg = ""
         self._direction = 90  # degree
         self._vel = 0  # rad/s
-
+        self._vel2 = 0
+        self._vel3 = 0
+        self._vel4 = 0
     def _sub_callback(self, msg):
         # Process the incoming message (if needed)
         # TODO show data in screen
@@ -50,10 +58,9 @@ class CarAKeyboardController(Node):
     def _pub_control(self):
         # Generate a random control signal
         control_signal = {
-            "type": str(DeviceDataTypeEnum.car_A_control),
-            "data": dict(CarAControl(
-                direction=self._direction,
-                target_vel=[self._vel, self._vel]
+            "type": str(DeviceDataTypeEnum.car_D_control),
+            "data": dict(CarDControl(
+                target_vel=[self._vel, self._vel2]
             ))
         }
         # Convert the control signal to a JSON string
@@ -63,7 +70,21 @@ class CarAKeyboardController(Node):
         # Publish the control signal
         self.publisher.publish(control_msg)
 
+        control_signal_forward = {
+            "type": str(DeviceDataTypeEnum.car_D_control),
+            "data": dict(CarDControl(
+                target_vel=[self._vel3, self._vel4]
+            ))
+        }
+        # Convert the control signal to a JSON string
+        control_msg_forward = String()
+        control_msg_forward.data = orjson.dumps(control_signal_forward).decode()
+
+        # Publish the control signal
+        self.publisher_forward.publish(control_msg_forward)
+
         self.get_logger().info(f'publish {control_msg}')
+        self.get_logger().info(f'publish to forward {control_msg_forward}')
 
     def run(self):
 
@@ -84,6 +105,10 @@ class CarAKeyboardController(Node):
                         self.handle_key_s()
                     elif c == ord('d'):
                         self.handle_key_d()
+                    elif c == ord('e'):
+                        self.handle_key_e()
+                    elif c == ord('r'):
+                        self.handle_key_r()
                     elif c == ord('z'):
                         self.handle_key_z()
                     elif c == ord('i'):
@@ -145,13 +170,18 @@ class CarAKeyboardController(Node):
         self.stdscr.addstr(f"car go forward")
 
         self._vel = 10  # rad/s
+        self._vel2 = 10  # rad/s
+        self._vel3 = 10  # rad/s
+        self._vel4 = 10  # rad/s
         # self.stdscr.move(1, 0)
         pass
 
     def handle_key_a(self):
         # Your action for the 'a' key here
-        self.stdscr.addstr(f"car turn left ")
-        self._direction = 75  # degree
+        self._vel = -10  # rad/s
+        self._vel2 = 10  # rad/s
+        self._vel3 = 10  # rad/s
+        self._vel4 = -10  # rad/s
 
         pass
 
@@ -159,13 +189,29 @@ class CarAKeyboardController(Node):
     def handle_key_s(self):
         self.stdscr.addstr(f"car go backward")
         self._vel = -10  # rad/s
+        self._vel2 = -10  # rad/s
+        self._vel3 = -10  # rad/s
+        self._vel4 = -10  # rad/s
         pass
 
     def handle_key_d(self):
-        self.stdscr.addstr(f"car turn right")
-        self._direction = 105  # degree
+        self._vel = 10  # rad/s
+        self._vel2 = -10  # rad/s
+        self._vel3 = -10  # rad/s
+        self._vel4 = 10  # rad/s
         pass
-
+    def handle_key_e(self):
+        self._vel = 10  # rad/s
+        self._vel2 = -10  # rad/s
+        self._vel3 = 10  # rad/s
+        self._vel4 = -10  # rad/s
+        pass
+    def handle_key_r(self):
+        self._vel = -10  # rad/s
+        self._vel2 = 10  # rad/s
+        self._vel3 = -10  # rad/s
+        self._vel4 = 10  # rad/s
+        pass
     def handle_key_z(self):
         self.stdscr.addstr(f"stop car")
         self._direction = 90  # degree

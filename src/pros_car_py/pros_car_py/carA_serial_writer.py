@@ -27,7 +27,7 @@ class CarAControlSubscriber(Node):
             self.listener_callback_forward,
             10
         )
-        serial_port_forward = self.declare_parameter('serial_port_2', SERIAL_DEV_FORWARD_DEFAULT).value
+        serial_port_forward = self.declare_parameter('serial_port_forward', SERIAL_DEV_FORWARD_DEFAULT).value
 
         self.subscription_forward  # prevent unused variable warning
         self._serial_forward = Serial(serial_port_forward, 115200, timeout=0)
@@ -50,7 +50,7 @@ class CarAControlSubscriber(Node):
             # TODO use more clear method to write
             # TODO divide serial data and data validation
             if control_data_forward.get('type') == DeviceDataTypeEnum.car_D_control:
-                self.process_control_data(CarDControl, control_data_forward.get('data', {}))
+                self.process_control_data_forward(CarDControl, control_data_forward.get('data', {}))
         except orjson.JSONDecodeError as e:
             self.get_logger().error('JSON decode error: {}'.format(e))
         except KeyError as e:

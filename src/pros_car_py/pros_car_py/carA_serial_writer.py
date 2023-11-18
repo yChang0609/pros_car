@@ -1,5 +1,4 @@
 from pros_car_py.env import SERIAL_DEV_DEFAULT, SERIAL_DEV_FORWARD_DEFAULT
-from pros_car_py.env import SERIAL_DEV_FORWARD_DEFAULT
 from pros_car_py.car_models import *
 import rclpy
 from rclpy.node import Node

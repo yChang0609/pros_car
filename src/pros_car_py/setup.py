@@ -30,6 +30,10 @@ setup(
             'carD_keyboard = pros_car_py.carD_keyboard:main',
             'carD_reader = pros_car_py.carD_serial_reader:main',
             'carD_writer = pros_car_py.carD_serial_writer:main',
+            'carB_random = pros_car_py.carB_random_AI:main',
+            'carB_keyboard = pros_car_py.carB_keyboard:main',
+            'carB_reader = pros_car_py.carB_serial_reader:main',
+            'carB_writer = pros_car_py.carB_serial_writer:main',
         ],
     },
 )

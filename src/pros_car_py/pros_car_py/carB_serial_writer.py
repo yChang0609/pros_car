@@ -7,7 +7,7 @@ from std_msgs.msg import String
 from serial import Serial
 
 
-class CarDControlSubscriber(Node):
+class CarBControlSubscriber(Node):
     def __init__(self):
         super().__init__('car_b_control_subscriber')
         self.subscription = self.create_subscription(

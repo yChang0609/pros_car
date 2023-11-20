@@ -39,7 +39,7 @@ class CarDSerialReader(Node):
                 # Assuming the incoming data is already in the required JSON format
                 state_msg = String()
                 # validation should be customized
-                state_data = dict(CarAState(**orjson.loads(incoming_data)))
+                state_data = dict(CarDState(**orjson.loads(incoming_data)))
                 state_msg.data = orjson.dumps(
                     dict(DeviceData(type=DeviceDataTypeEnum.car_D_state,
                                     data=state_data))

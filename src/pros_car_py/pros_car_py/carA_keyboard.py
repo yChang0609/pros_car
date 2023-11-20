@@ -11,14 +11,14 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 
-class CarAKeyboardController(Node):
+class CarDKeyboardController(Node):
     def __init__(self, stdscr):
         super().__init__('car_D_keyboard')
 
         # Subscriber
         self.subscription = self.create_subscription(
             String,
-            DeviceDataTypeEnum.car_A_state,
+            DeviceDataTypeEnum.car_D_state,
             self._sub_callback,
             10
         )
@@ -42,7 +42,6 @@ class CarAKeyboardController(Node):
         self.stdscr.keypad(False)
         self.key_in_count = 0
         self._car_state_msg = ""
-        self._direction = 90  # degree
         self._vel1 = 0  # rad/s
         self._vel2 = 0
         self._vel3 = 0
@@ -85,7 +84,6 @@ class CarAKeyboardController(Node):
         self.get_logger().info(f'publish to forward {control_msg_forward}')
 
     def run(self):
-
         self.stdscr.nodelay(True)
         try:
             while rclpy.ok():
@@ -216,7 +214,7 @@ class CarAKeyboardController(Node):
 def main(args=None):
     rclpy.init(args=args)
     stdscr = curses.initscr()
-    node = CarAKeyboardController(stdscr)
+    node = CarDKeyboardController(stdscr)
 
     # Spin the node in a separate thread
     spin_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)

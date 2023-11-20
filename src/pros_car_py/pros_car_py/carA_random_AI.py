@@ -7,14 +7,14 @@ from std_msgs.msg import String
 import random
 
 
-class CarARandomAI(Node):
+class CarDRandomAI(Node):
     def __init__(self):
-        super().__init__('car_a_random_ai')
+        super().__init__('car_d_random_ai')
 
         # Subscriber
         self.subscription = self.create_subscription(
             String,
-            DeviceDataTypeEnum.car_A_state,
+            DeviceDataTypeEnum.car_D_state,
             self._sub_callback,
             10
         )
@@ -23,7 +23,7 @@ class CarARandomAI(Node):
         # Publisher
         self.publisher = self.create_publisher(
             String,
-            DeviceDataTypeEnum.car_A_control,  # topic name
+            DeviceDataTypeEnum.car_D_control,  # topic name
             10
         )
         self.pub_timer = self.create_timer(2, self._pub_callback)
@@ -41,8 +41,8 @@ class CarARandomAI(Node):
     def _pub_callback(self):
         # Generate a random control signal
         control_signal = {
-            "type": str(DeviceDataTypeEnum.car_A_control),
-            "data": dict(CarAControl(
+            "type": str(DeviceDataTypeEnum.car_D_control),
+            "data": dict(CarDControl(
                 direction=random.randint(70, 110),
                 target_vel=[random.uniform(-20, 20), random.uniform(-20, 20)]
             ))
@@ -59,9 +59,9 @@ class CarARandomAI(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    car_a_random_ai = CarARandomAI()
-    rclpy.spin(car_a_random_ai)
-    car_a_random_ai.destroy_node()
+    car_d_random_ai = CarDRandomAI()
+    rclpy.spin(car_d_random_ai)
+    car_d_random_ai.destroy_node()
     rclpy.shutdown()
 
 

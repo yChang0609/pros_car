@@ -7,9 +7,9 @@ from std_msgs.msg import String
 from serial import Serial
 
 
-class CarAControlSubscriber(Node):
+class CarDControlSubscriber(Node):
     def __init__(self):
-        super().__init__('car_a_control_subscriber')
+        super().__init__('car_d_control_subscriber')
         self.subscription = self.create_subscription(
             String,
             DeviceDataTypeEnum.car_D_control,  # topic name
@@ -82,9 +82,9 @@ class CarAControlSubscriber(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    car_a_control_subscriber = CarAControlSubscriber()
-    rclpy.spin(car_a_control_subscriber)
-    car_a_control_subscriber.destroy_node()
+    car_d_control_subscriber = CarDControlSubscriber()
+    rclpy.spin(car_d_control_subscriber)
+    car_d_control_subscriber.destroy_node()
     rclpy.shutdown()
 
 

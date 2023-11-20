@@ -52,6 +52,15 @@ class CarAControl(pydantic.BaseModel):
     direction: int = 90
 
 
+class CarBState(pydantic.BaseModel):
+    vels: List[float] = []
+    encoders: List[int] = []
+
+
+class CarBControl(pydantic.BaseModel):
+    target_vel: List[float] = []
+
+
 class CarCState(pydantic.BaseModel):
     vels: List[float] = []
     encoders: List[int] = []

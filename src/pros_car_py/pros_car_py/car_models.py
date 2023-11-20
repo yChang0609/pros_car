@@ -52,6 +52,15 @@ class CarAControl(pydantic.BaseModel):
     direction: int = 90
 
 
+class CarBState(pydantic.BaseModel):
+    vels: List[float] = []
+    encoders: List[int] = []
+
+
+class CarBControl(pydantic.BaseModel):
+    target_vel: List[float] = []
+
+
 class CarDState(pydantic.BaseModel):
     vels: List[float] = []
     encoders: List[int] = []
@@ -59,11 +68,6 @@ class CarDState(pydantic.BaseModel):
 
 class CarDControl(pydantic.BaseModel):
     target_vel: List[float] = []
-
-
-class CarDState(pydantic.BaseModel):
-    vels: List[float] = []
-    encoders: List[int] = []
 
 
 class TwoWheelAndServoControlSignal(pydantic.BaseModel):

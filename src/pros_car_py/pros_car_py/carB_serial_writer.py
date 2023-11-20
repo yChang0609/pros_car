@@ -35,7 +35,6 @@ class CarBControlSubscriber(Node):
             self.get_logger().error('Missing key in JSON data: {}'.format(e))
 
     def process_control_data(self, type_cls, data: dict):
-
         # TODO should be customized
         control_signal = type_cls(**data)
 

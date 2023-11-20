@@ -8,16 +8,16 @@ from serial import Serial
 from rclpy.duration import Duration
 
 
-class CarDSerialReader(Node):
+class CarBSerialReader(Node):
     def __init__(self):
-        super().__init__('car_d_serial_reader')
+        super().__init__('car_b_serial_reader')
 
         serial_port = self.declare_parameter('serial_port', SERIAL_DEV_DEFAULT).value
         self._serial = Serial(serial_port, 115200, timeout=0)
 
         self.publisher = self.create_publisher(
             String,
-            DeviceDataTypeEnum.car_D_state,
+            DeviceDataTypeEnum.car_B_state,
             10
         )
 
@@ -39,9 +39,9 @@ class CarDSerialReader(Node):
                 # Assuming the incoming data is already in the required JSON format
                 state_msg = String()
                 # validation should be customized
-                state_data = dict(CarAState(**orjson.loads(incoming_data)))
+                state_data = dict(CarBState(**orjson.loads(incoming_data)))
                 state_msg.data = orjson.dumps(
-                    dict(DeviceData(type=DeviceDataTypeEnum.car_D_state,
+                    dict(DeviceData(type=DeviceDataTypeEnum.car_B_state,
                                     data=state_data))
                 ).decode()
                 self.publisher.publish(state_msg)
@@ -51,9 +51,9 @@ class CarDSerialReader(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    car_d_state_publisher = CarDSerialReader()
-    rclpy.spin(car_d_state_publisher)
-    car_d_state_publisher.destroy_node()
+    car_b_state_publisher = CarBSerialReader()
+    rclpy.spin(car_b_state_publisher)
+    car_b_state_publisher.destroy_node()
     rclpy.shutdown()
 
 

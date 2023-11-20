@@ -145,63 +145,62 @@ class CarDKeyboardController(Node):
 
         # self.get_logger().debug(f"{self.key_in_count:5d} Key '{chr(key)}' pressed!")
 
-    def handle_key_w(self):
+    def handle_key_w(self, vel: float = 10):
         # Your action for the 'w' key here
         self.stdscr.addstr(f"car go forward")
 
-        self._vel1 = 10  # rad/s
-        self._vel2 = 10  # rad/s
-        self._vel3 = 10  # rad/s
-        self._vel4 = 10  # rad/s
+        self._vel1 = vel  # rad/s
+        self._vel2 = vel  # rad/s
+        self._vel3 = vel  # rad/s
+        self._vel4 = vel  # rad/s
         # self.stdscr.move(1, 0)
         pass
 
-    def handle_key_a(self):
+    def handle_key_a(self, vel: float = 10):
         # Your action for the 'a' key here
         self.stdscr.addstr(f"car go left")
-        self._vel1 = -10  # rad/s
-        self._vel2 = 10  # rad/s
-        self._vel3 = 10  # rad/s
-        self._vel4 = -10  # rad/s
+        self._vel1 = -vel  # rad/s
+        self._vel2 = vel  # rad/s
+        self._vel3 = vel  # rad/s
+        self._vel4 = -vel  # rad/s
 
         pass
 
     # Add methods for other keys similarly
-    def handle_key_s(self):
+    def handle_key_s(self, vel: float = 10):
         self.stdscr.addstr(f"car go backward")
-        self._vel1 = -10  # rad/s
-        self._vel2 = -10  # rad/s
-        self._vel3 = -10  # rad/s
-        self._vel4 = -10  # rad/s
+        self._vel1 = -vel  # rad/s
+        self._vel2 = -vel  # rad/s
+        self._vel3 = -vel  # rad/s
+        self._vel4 = -vel  # rad/s
         pass
 
-    def handle_key_d(self):
+    def handle_key_d(self, vel: float = 10):
         self.stdscr.addstr(f"car go right")
-        self._vel1 = 10  # rad/s
-        self._vel2 = -10  # rad/s
-        self._vel3 = -10  # rad/s
-        self._vel4 = 10  # rad/s
+        self._vel1 = vel  # rad/s
+        self._vel2 = -vel  # rad/s
+        self._vel3 = -vel  # rad/s
+        self._vel4 = vel  # rad/s
         pass
 
-    def handle_key_e(self):
+    def handle_key_e(self, vel: float = 10):
         self.stdscr.addstr(f"car go clockwise")
-        self._vel1 = 10  # rad/s
-        self._vel2 = -10  # rad/s
-        self._vel3 = 10  # rad/s
-        self._vel4 = -10  # rad/s
+        self._vel1 = vel  # rad/s
+        self._vel2 = -vel  # rad/s
+        self._vel3 = vel  # rad/s
+        self._vel4 = -vel  # rad/s
         pass
 
-    def handle_key_r(self):
+    def handle_key_r(self, vel: float = 10):
         self.stdscr.addstr(f"car go counterclockwise")
-        self._vel1 = -10  # rad/s
-        self._vel2 = 10  # rad/s
-        self._vel3 = -10  # rad/s
-        self._vel4 = 10  # rad/s
+        self._vel1 = -vel  # rad/s
+        self._vel2 = vel  # rad/s
+        self._vel3 = -vel  # rad/s
+        self._vel4 = vel  # rad/s
         pass
 
     def handle_key_z(self):
         self.stdscr.addstr(f"stop car")
-        self._direction = 90  # degree
         self._vel1 = 0  # rad/s
         self._vel2 = 0
         self._vel3 = 0

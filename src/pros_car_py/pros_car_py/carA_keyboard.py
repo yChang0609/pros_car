@@ -140,30 +140,30 @@ class CarAKeyboardController(Node):
 
         # self.get_logger().debug(f"{self.key_in_count:5d} Key '{chr(key)}' pressed!")
 
-    def handle_key_w(self):
+    def handle_key_w(self, vel: float = 10):
         # Your action for the 'w' key here
         self.stdscr.addstr(f"car go forward")
 
-        self._vel = 10  # rad/s
+        self._vel = vel  # rad/s
         # self.stdscr.move(1, 0)
         pass
 
-    def handle_key_a(self):
+    def handle_key_a(self, dir: float = 75):
         # Your action for the 'a' key here
         self.stdscr.addstr(f"car turn left ")
-        self._direction = 75  # degree
+        self._direction = dir  # degree
 
         pass
 
     # Add methods for other keys similarly
-    def handle_key_s(self):
+    def handle_key_s(self, vel: float = 10):
         self.stdscr.addstr(f"car go backward")
-        self._vel = -10  # rad/s
+        self._vel = -vel  # rad/s
         pass
 
-    def handle_key_d(self):
+    def handle_key_d(self, dir: float = 105):
         self.stdscr.addstr(f"car turn right")
-        self._direction = 105  # degree
+        self._direction = dir  # degree
         pass
 
     def handle_key_z(self):

@@ -48,7 +48,7 @@ class CarBKeyboardController(Node):
     def _pub_control(self):
         # Generate a random control signal
         control_signal = {
-            "type": str(DeviceDataTypeEnum.car_D_control),
+            "type": str(DeviceDataTypeEnum.car_B_control),
             "data": dict(CarDControl(
                 target_vel=[self._vel1, self._vel2]
             ))

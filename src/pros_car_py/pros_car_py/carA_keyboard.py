@@ -220,6 +220,9 @@ class CarAKeyboardController(Node):
         self.stdscr.addstr(f"stop car")
         self._direction = 90  # degree
         self._vel = 0  # rad/s
+        self._vel2 = 0
+        self._vel3 = 0
+        self._vel4 = 0
         pass
 
     def handle_key_i(self):

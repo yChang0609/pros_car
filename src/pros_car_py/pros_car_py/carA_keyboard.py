@@ -50,6 +50,7 @@ class CarAKeyboardController(Node):
         self._vel2 = 0
         self._vel3 = 0
         self._vel4 = 0
+
     def _sub_callback(self, msg):
         # Process the incoming message (if needed)
         # TODO show data in screen
@@ -202,6 +203,7 @@ class CarAKeyboardController(Node):
         self._vel3 = -10  # rad/s
         self._vel4 = 10  # rad/s
         pass
+
     def handle_key_e(self):
         self.stdscr.addstr(f"car go forward")
         self._vel = 10  # rad/s
@@ -209,6 +211,7 @@ class CarAKeyboardController(Node):
         self._vel3 = 10  # rad/s
         self._vel4 = -10  # rad/s
         pass
+
     def handle_key_r(self):
         self.stdscr.addstr(f"car go forward")
         self._vel = -10  # rad/s
@@ -216,6 +219,7 @@ class CarAKeyboardController(Node):
         self._vel3 = -10  # rad/s
         self._vel4 = 10  # rad/s
         pass
+
     def handle_key_z(self):
         self.stdscr.addstr(f"stop car")
         self._direction = 90  # degree

@@ -20,7 +20,7 @@ class CarAControlSubscriber(Node):
 
         self.subscription  # prevent unused variable warning
         self._serial = Serial(serial_port, 115200, timeout=0)
-# ------------------------------------------------------------------
+        # ------------------------------------------------------------------
         self.subscription_forward = self.create_subscription(
             String,
             "test",  # topic name
@@ -31,7 +31,8 @@ class CarAControlSubscriber(Node):
 
         self.subscription_forward  # prevent unused variable warning
         self._serial_forward = Serial(serial_port_forward, 115200, timeout=0)
-# -------------------------------------------------------------------
+
+    # -------------------------------------------------------------------
     def listener_callback(self, msg):
         try:
             control_data = orjson.loads(msg.data)

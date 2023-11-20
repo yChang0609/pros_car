@@ -145,6 +145,7 @@ class CarAKeyboardController(Node):
         self.stdscr.addstr(f"car go forward")
 
         self._vel = vel  # rad/s
+        self._direction = 90  # degree
         # self.stdscr.move(1, 0)
         pass
 
@@ -152,13 +153,13 @@ class CarAKeyboardController(Node):
         # Your action for the 'a' key here
         self.stdscr.addstr(f"car turn left ")
         self._direction = dir  # degree
-
         pass
 
     # Add methods for other keys similarly
     def handle_key_s(self, vel: float = 10):
         self.stdscr.addstr(f"car go backward")
         self._vel = -vel  # rad/s
+        self._direction = 90  # degree
         pass
 
     def handle_key_d(self, dir: float = 105):
@@ -175,31 +176,26 @@ class CarAKeyboardController(Node):
     def handle_key_i(self):
         self.stdscr.addstr(f"arm rift up")
         self.joint_pos[2] += 0.05
-
         pass
 
     def handle_key_j(self):
         self.stdscr.addstr(f"arm turn left")
         self.joint_pos[0] -= 0.05
-
         pass
 
     def handle_key_k(self):
         self.stdscr.addstr(f"arm rift down")
         self.joint_pos[2] -= 0.05
-
         pass
 
     def handle_key_l(self):
         self.stdscr.addstr(f"arm turn right")
         self.joint_pos[0] += 0.05
-
         pass
 
     def handle_key_u(self):
         self.stdscr.addstr(f"arm j4 rotate left")
         self.joint_pos[3] -= 0.05
-
         pass
 
     def handle_key_o(self):
@@ -215,7 +211,6 @@ class CarAKeyboardController(Node):
     def handle_key_h(self):
         self.stdscr.addstr(f"arm release!")
         self.joint_pos[4] = 1.0
-
         pass
 
     def pub_arm(self):

@@ -159,10 +159,10 @@ class CarDKeyboardController(Node):
     def handle_key_a(self, vel: float = 10):
         # Your action for the 'a' key here
         self.stdscr.addstr(f"car go left")
-        self._vel1 = -vel  # rad/s
-        self._vel2 = vel  # rad/s
-        self._vel3 = vel  # rad/s
-        self._vel4 = -vel  # rad/s
+        self._vel1 = vel  # rad/s
+        self._vel2 = -vel  # rad/s
+        self._vel3 = -vel  # rad/s
+        self._vel4 = vel  # rad/s
 
         pass
 
@@ -177,10 +177,10 @@ class CarDKeyboardController(Node):
 
     def handle_key_d(self, vel: float = 10):
         self.stdscr.addstr(f"car go right")
-        self._vel1 = vel  # rad/s
-        self._vel2 = -vel  # rad/s
-        self._vel3 = -vel  # rad/s
-        self._vel4 = vel  # rad/s
+        self._vel1 = -vel  # rad/s
+        self._vel2 = vel  # rad/s
+        self._vel3 = vel  # rad/s
+        self._vel4 = -vel  # rad/s
         pass
 
     def handle_key_e(self, vel: float = 10):

@@ -12,11 +12,11 @@ __pycache__/
 ssh/
 # C extensions
 *.so
-.env
-*.env
+# .env
+# *.env
 # Distribution / packaging
 .Python
-env/
+# env/
 build/
 develop-eggs/
 dist/

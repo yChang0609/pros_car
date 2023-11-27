@@ -7,11 +7,11 @@ services:
     tty: false
     env_file:
       - .env
-    environment:
-      - ROS_DOMAIN_ID
-      - SERIAL_DEV_DEFAULT
-      - SERIAL_FRONT_DEFAULT
-      - SERIAL_LIDAR_DEFAULT
+#    environment:
+#      - ROS_DOMAIN_ID
+#      - SERIAL_DEV_DEFAULT
+#      - SERIAL_FRONT_DEFAULT
+#      - SERIAL_LIDAR_DEFAULT
     networks:
       - my_bridge_network
     # privileged: true
@@ -27,11 +27,6 @@ services:
     tty: true         # docker run -t
     env_file:
       - .env
-    environment:
-      - ROS_DOMAIN_ID
-      - SERIAL_DEV_DEFAULT
-      - SERIAL_FRONT_DEFAULT
-      - SERIAL_LIDAR_DEFAULT
     networks:
       - my_bridge_network
     # privileged: true

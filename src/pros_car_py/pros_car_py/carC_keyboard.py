@@ -9,11 +9,13 @@ import curses
 import threading
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectoryPoint
+from pros_car_py.env import *
 
 
 class CarCKeyboardController(Node):
-    def __init__(self, stdscr):
+    def __init__(self, stdscr, vel: float = 10):
         super().__init__('car_C_keyboard')
+        self.vel = vel
 
         # Subscriber
         self.subscription = self.create_subscription(
@@ -83,7 +85,9 @@ class CarCKeyboardController(Node):
         self.get_logger().info(f'publish {control_msg}')
         self.get_logger().info(f'publish to forward {control_msg_forward}')
 
-    def run(self):
+    def run(self, vel=None):
+        if vel is None:
+            vel = self.vel
         self.stdscr.nodelay(True)
         try:
             while rclpy.ok():
@@ -94,17 +98,17 @@ class CarCKeyboardController(Node):
                     self.key_in_count += 1
                     self.print_basic_info(c)
                     if c == ord('w'):
-                        self.handle_key_w()
+                        self.handle_key_w(vel)
                     elif c == ord('a'):
-                        self.handle_key_a()
+                        self.handle_key_a(vel)
                     elif c == ord('s'):
-                        self.handle_key_s()
+                        self.handle_key_s(vel)
                     elif c == ord('d'):
-                        self.handle_key_d()
+                        self.handle_key_d(vel)
                     elif c == ord('e'):
-                        self.handle_key_e()
+                        self.handle_key_e(vel)
                     elif c == ord('r'):
-                        self.handle_key_r()
+                        self.handle_key_r(vel)
                     elif c == ord('z'):
                         self.handle_key_z()
                     elif c == ord('q'):  # Exit on 'q'
@@ -213,7 +217,8 @@ class CarCKeyboardController(Node):
 def main(args=None):
     rclpy.init(args=args)
     stdscr = curses.initscr()
-    node = CarCKeyboardController(stdscr)
+    vel = 10 if WHEEL_SPEED is None else float(WHEEL_SPEED)
+    node = CarCKeyboardController(stdscr, vel=vel)
 
     # Spin the node in a separate thread
     spin_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)

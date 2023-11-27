@@ -1,27 +1,46 @@
-version: '3.1'
+version: '3.7'
 
 services:
-  car_driver:
-    image: public.ecr.aws/paia-tech/pros-car:latest
+  car_writer:
+    image: otischung/pros_car:2.1.1
+    stdin_open: false
+    tty: false
     env_file:
       - .env
     environment:
       - ROS_DOMAIN_ID
       - SERIAL_DEV_DEFAULT
-    network_mode: host
-    privileged: true
-    # TODO connect the device you need
-    command: ros2 launch pros_car_py carA_driver.launch.py
+      - SERIAL_FRONT_DEFAULT
+      - SERIAL_LIDAR_DEFAULT
+    networks:
+      - my_bridge_network
+    # privileged: true
+    devices:
+      - "/dev/usb_lidar:/dev/usb_lidar"
+      - "/dev/usb_front_wheel:/dev/usb_front_wheel"
+      - "/dev/usb_rear_wheel:/dev/usb_rear_wheel"
+    command: ros2 run pros_car_py car${CAR_TYPE}_writer
   
-  carA_random:
-    image: public.ecr.aws/paia-tech/pros-car:latest
+  car_keyboard:
+    image: otischung/pros_car:2.1.1
+    stdin_open: true  # docker run -i
+    tty: true         # docker run -t
     env_file:
       - .env
     environment:
       - ROS_DOMAIN_ID
-    network_mode: host
+      - SERIAL_DEV_DEFAULT
+      - SERIAL_FRONT_DEFAULT
+      - SERIAL_LIDAR_DEFAULT
+    networks:
+      - my_bridge_network
+    # privileged: true
+    devices:
+      - "/dev/usb_lidar:/dev/usb_lidar"
+      - "/dev/usb_front_wheel:/dev/usb_front_wheel"
+      - "/dev/usb_rear_wheel:/dev/usb_rear_wheel"
+    command: ros2 run pros_car_py car${CAR_TYPE}_keyboard
 
-    command: ros2 launch pros_car_py carA_random.launch.py
-
-  # rosbridge:
-  # random:
+networks:
+  my_bridge_network:
+    driver: bridge

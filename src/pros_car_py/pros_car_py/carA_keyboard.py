@@ -82,11 +82,11 @@ class CarAKeyboardController(Node):
                     if c == ord('w'):
                         self.handle_key_w(vel)
                     elif c == ord('a'):
-                        self.handle_key_a(vel)
+                        self.handle_key_a()
                     elif c == ord('s'):
                         self.handle_key_s(vel)
                     elif c == ord('d'):
-                        self.handle_key_d(vel)
+                        self.handle_key_d()
                     elif c == ord('z'):
                         self.handle_key_z()
                     elif c == ord('i'):

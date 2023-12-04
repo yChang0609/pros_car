@@ -31,8 +31,10 @@ class DeviceDataTypeEnum(StringEnum):
     car_B_state = auto()
     car_B_control = auto()
     car_C_state = auto()
+    car_C_state_front = auto()
     car_C_control = auto()
     car_D_state = auto()
+    car_D_state_front = auto()
     car_D_control = auto()
 
 

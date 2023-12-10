@@ -139,6 +139,30 @@ After that, you can build your image from `Dockerfile` by launching `dev contain
 
 
 
+## Environment Variables
+
+These environment variables are defined in `.env`.
+
+### ROS Domain ID
+
+You may change the ID number to divide other ROS environments.
+
+```bash
+export ROS_DOMAIN_ID=1
+```
+
+
+
+### Setting for the Speed of the Car
+
+You can change the speed of your car via the Linux environment variable `WHEEL_SPEED` using the unit rad/s.
+
+```bash
+export WHEEL_SPEED=3
+```
+
+
+
 ## ROS2 Services
 
 ### The Password of Cars

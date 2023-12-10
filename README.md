@@ -1,4 +1,4 @@
-# PROS-Boilerplate
+# PROS-Car
 
 Authors:
 
@@ -24,91 +24,185 @@ Advising professor:
 
 
 
-## Getting started
+## Workflow Diagram
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+![workflow_diagram](./img/workflow_diagram.png)
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
 
-## Add your files
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+## Feature
 
+The docker image in this project has the following 4 features shown above.
+
+- `Keyboard`
+- `Car_<A,B,C,D>_serial_reader`
+- `Car_<A,B,C,D>_serial_writer`
+- `RandomAI`
+
+
+
+## The Link to the other Features
+
+[pros_app](https://github.com/otischung/pros_app) contains the following features.
+
+- `RPLidar`
+- `Camera`
+- `SLAM`
+
+[pros_AI](https://github.com/otischung/pros_AI) contains `Car_B_AI`.
+
+[pros_AI_image](https://github.com/otischung/pros_AI_image) contains the docker image used by pros_AI.
+
+
+
+# Get Started
+
+## Docker
+
+### GitLab Repository
+
+You can clone it by using HTTPS
+
+```bash
+git clone https://github.com/otischung/pros_car
 ```
-cd existing_repo
-git remote add origin https://paia-tech.synology.me:8943/pros/pros-boilerplate.git
-git branch -M main
-git push -uf origin main
+
+
+
+### Add User to Docker Group
+
+You must add the user to the docker group to get permission for docker.
+
+```bash
+usermod -a -G docker <username>
 ```
 
-## Integrate with your tools
 
-- [ ] [Set up project integrations](https://paia-tech.synology.me:8943/pros/pros-boilerplate/-/settings/integrations)
 
-## Collaborate with your team
+### Pull Image
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+You can pull the docker image by the following command. This image is automatically built by GitHub Actions CI and it contains two versions of OS type, including amd64 and arm64.
 
-## Test and Deploy
+```bash
+ docker pull ghcr.io/otischung/pros_car:latest
+```
 
-Use the built-in continuous integration in GitLab.
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
 
-***
+### Build Image (Optional)
 
-# Editing this README
+After successfully pulling the GitHub repository, you can build your image by executing the following command.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
+```jsx
+docker build -t <username>/<projname>:<tagname> .
+```
 
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+This will read the `Dockerfile` in the current directory.
 
-## Name
-Choose a self-explaining name for your project.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+### Run Image
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+After building the image, execute the following command to run the image to become the desired container.
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```bash
+docker run -it --rm --network host --privileged=true --env-file ./.env <username>/<projname>:<tagname> /bin/bash
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+- `-i`: The container will get `stdin` from your keyboard.
+- `-t`: The container screen will show on your display monitor.
+- `--rm`: The container will be shut down automatically when detaching.
+- `--network host`: All ports inside the container will be assigned to host ports.
+- `--privileged=true`: The user in the container will have all permissions, including read and write `ttyUSB*`. Or just type `--privileged`.
+- `--env-file`: This will pass the environment variables defined in the specific file to the container.
+- In the end, tell the container what type of terminal should be opened. We use `bash` in this case.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+### Use the Shell Script to Run the Image
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+We've written 2 shell scripts to run the image.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+> car_control_2.sh
+>
+> car_control_4.sh
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
 
-## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+### A Quick Solution for Developing Containers
+
+VSCode has these extensions, which are `docker` and `dev containers`.
+
+After that, you can build your image from `Dockerfile` by launching `dev containers`.
+
+- Press `ctrl+shift+p`, then select `Dev Containers: Rebuild and Reopen`.
+
+
+
+## ROS2 Services
+
+### The Password of Cars
+
+`digitaltwin`
+
+
+
+### Code
+
+- `Dockerfile`
+  - You may change the ID number to divide other ROS environments.
+
+```python
+ENV ROS_DOMAIN_ID=1
+```
+
+- `Car<A~D>_serial_writer.py`
+  - Send the signals to jetson orin nano, receive the signals from `Car<A~D>_keyboard.py`.
+- `Car<A~D>_keyboard.py`
+- Send the signal to `Car<A~D>_serial_writer.py`, in `target_vel`, index 0 is the left wheel, index 1 is the right wheel.
+- if the car type is four-wheel drive, we have two lists, one contains `self._vel` and  `self._vel2` and the other contains `self._vel3` and `self._vel4`.
+
+```python
+# two wheels:
+target_vel = [self._vel, self._vel]
+
+# four wheels 
+target_vel = [self._vel, self._vel2] 
+target_vel = [self._vel3, self._vel4] 
+# These two target velocities are sent through different topics
+```
+
+- `env.py`
+
+  - When we set the USB port, if we run `Car<A~D>_serial_writer.py` and the terminal shows that “cannot find the desired USB port”, then you have to edit this script or check out the USB port on the car device.
+  - You can run `ls /dev/ttyUSB*` to check your USB port number. 
+    (if there doesn’t appear any USB devices, you must exit docker, and check the USB port on the car, `ttyUSB<0~3>` number depends on the inserted order)
+  - We've defined <font color=#FF0000>the name of the soft link</font> for `usb_front_wheel`, `usb_rear_wheel`, and `usb_lidar` in [pros_app](https://github.com/otischung/pros_app). You may also use these rules in this container.
+
+- `car_models.py`
+
+  - For all received data-class types, which the behavior is like `struct` in `C/C++`.
+
+- Open two terminals to run the car
+
+  - We use `tmux` to open two terminals, press`ctrl+B` → `shift+5` will open two terminals vertically; and press `ctrl+B` → `shift+"` will open two terminals horizontally, using `ctrl+b` + arrow keys to change between terminals.
+
+  ```python
+  sudo apt install tmux
+  ```
+
+- run the car (open two terminals)
+
+  - Use `w a s d` or other keys to control the car.
+  - Press `z` to stop the car.
+    - Note: The car will always go forward and then stop slowly in any case. This is a bug in the C++ program controlling the ESP32.
+  - Press `q` to exit the `keyboard.py`.
+
+  ```python
+  ros2 run pros_car_py car<A~D>_serial_writer.py
+  ```
+
+  ```python
+  ros2 run pros_car_py car<A~D>_keyboard.py
+  ```
+

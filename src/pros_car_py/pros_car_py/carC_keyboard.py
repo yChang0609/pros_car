@@ -16,6 +16,8 @@ class CarCKeyboardController(Node):
     def __init__(self, stdscr, vel: float = 10):
         super().__init__('car_C_keyboard')
         self.vel = vel
+        self.rotate_angle = 5
+        self.rotate_speed = 15
 
         # Subscriber
         self.subscription = self.create_subscription(
@@ -37,6 +39,13 @@ class CarCKeyboardController(Node):
             "test",  # topic name
             10
         )
+
+        self.joint_trajectory_publisher_ = self.create_publisher(
+            JointTrajectoryPoint,
+            'joint_trajectory_point',
+            10
+        )
+        self.joint_pos = [1.57, 1.57, 1.57, 1.57, 1.0]
 
         self.stdscr = stdscr
         curses.noecho()
@@ -111,14 +120,35 @@ class CarCKeyboardController(Node):
                         self.handle_key_r(vel)
                     elif c == ord('z'):
                         self.handle_key_z()
+                    #  以下都是機械手臂
+                    elif c == ord('i'):
+                        self.handle_key_i()
+                    elif c == ord('j'):
+                        self.handle_key_j()
+                    elif c == ord('k'):
+                        self.handle_key_k()
+                    elif c == ord('l'):
+                        self.handle_key_l()
+                    elif c == ord('u'):
+                        self.handle_key_u()
+                    elif c == ord('o'):
+                        self.handle_key_o()
+                    elif c == ord('y'):
+                        self.handle_key_y()
+                    elif c == ord('h'):
+                        self.handle_key_h()
+                    elif c == ord('n'):
+                        self.handle_key_n()
+                    elif c == ord('m'):
+                        self.handle_key_m()
                     elif c == ord('q'):  # Exit on 'q'
                         self._direction = 90  # degree
                         self._vel1 = 0  # rad/s
                         self._pub_control()
-
                         break
                     self._pub_control()
-                    # self.pub_arm()
+                    self.pub_arm()
+                    print()
                 else:
                     self.print_basic_info(ord(' '))
                     time.sleep(0.01)
@@ -142,7 +172,6 @@ class CarCKeyboardController(Node):
         self.stdscr.move(1, 0)
         self.stdscr.addstr(f"Received msg : {self._car_state_msg}")
 
-        # 
         # self.stdscr.move(4, 0)
         # self.stdscr.addstr(f"Arm pos : {self.joint_pos}")
         # self.stdscr.move(5, 0)
@@ -189,18 +218,18 @@ class CarCKeyboardController(Node):
 
     def handle_key_e(self, vel: float = 10):
         self.stdscr.addstr(f"car go clockwise")
-        self._vel1 = vel  # rad/s
-        self._vel2 = -vel  # rad/s
-        self._vel3 = vel  # rad/s
-        self._vel4 = -vel  # rad/s
+        self._vel1 = self.rotate_speed  # rad/s
+        self._vel2 = -self.rotate_speed  # rad/s
+        self._vel3 = self.rotate_speed  # rad/s
+        self._vel4 = -self.rotate_speed  # rad/s
         pass
 
     def handle_key_r(self, vel: float = 10):
         self.stdscr.addstr(f"car go counterclockwise")
-        self._vel1 = -vel  # rad/s
-        self._vel2 = vel  # rad/s
-        self._vel3 = -vel  # rad/s
-        self._vel4 = vel  # rad/s
+        self._vel1 = -self.rotate_speed  # rad/s
+        self._vel2 = self.rotate_speed  # rad/s
+        self._vel3 = -self.rotate_speed  # rad/s
+        self._vel4 = self.rotate_speed  # rad/s
         pass
 
     def handle_key_z(self):
@@ -211,9 +240,66 @@ class CarCKeyboardController(Node):
         self._vel4 = 0
         pass
 
+    #  機械手臂控制----------------
+    def handle_key_l(self):
+        self.stdscr.addstr(f"arm turn right")
+        self.joint_pos[0] += self.rotate_angle
+        pass
+
+    def handle_key_j(self):
+        self.stdscr.addstr(f"arm turn left")
+        self.joint_pos[0] -= self.rotate_angle
+        pass
+
+    def handle_key_i(self):
+        self.stdscr.addstr(f"arm rift up")
+        self.joint_pos[1] += self.rotate_angle
+        pass
+
+    def handle_key_k(self):
+        self.stdscr.addstr(f"arm rift down")
+        self.joint_pos[1] -= self.rotate_angle
+        pass
+
+    def handle_key_y(self):
+        self.stdscr.addstr(f"arm catch!")
+        self.joint_pos[2] += self.rotate_angle
+        pass
+
+    def handle_key_h(self):
+        self.stdscr.addstr(f"arm release!")
+        self.joint_pos[2] -= self.rotate_angle
+        pass
+
+    def handle_key_n(self):
+        self.stdscr.addstr(f"arm release!")
+        self.joint_pos[3] -= self.rotate_angle
+        pass
+
+    def handle_key_m(self):
+        self.stdscr.addstr(f"arm release!")
+        self.joint_pos[3] += self.rotate_angle
+        pass
+
+    def handle_key_u(self):
+        self.stdscr.addstr(f"arm j4 rotate left")
+        self.joint_pos[4] -= self.rotate_angle
+        pass
+
+    def handle_key_o(self):
+        self.stdscr.addstr(f"arm j4 rotate right")
+        self.joint_pos[4] += self.rotate_angle
+        pass
+
+    def pub_arm(self):
+        msg = JointTrajectoryPoint()
+        msg.positions = self.joint_pos  # Replace with actual desired positions
+        msg.velocities = [0.0, 0.0, 0.0, 0.0, 0.0]  # Replace with actual desired velocities
+        # You can set other fields of the JointTrajectoryPoint message similarly.
+        self.joint_trajectory_publisher_.publish(msg)
+
 
 # ... Rest of your code, e.g. initializing rclpy and running the node
-
 def main(args=None):
     rclpy.init(args=args)
     stdscr = curses.initscr()

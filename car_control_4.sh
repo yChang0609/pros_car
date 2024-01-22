@@ -1,1 +1,1 @@
-docker run -it --rm -v "$(pwd)/src:/workspaces/src" --device=/dev/usb_front_wheel --device=/dev/usb_rear_wheel --device=/dev/usb_robot_arm --network host --env-file ./.env ghcr.io/otischung/pros_car:latest /bin/bash
+docker run -it --rm -v "$(pwd)/src:/workspaces/src" -p 9090:9090 --network pros_app_my_bridge_network --device=/dev/usb_front_wheel --device=/dev/usb_rear_wheel --device=/dev/usb_robot_arm  --env-file ./.env ghcr.io/otischung/pros_car:latest /bin/bash

@@ -16,7 +16,7 @@ class CarCKeyboardController(Node):
     def __init__(self, stdscr, vel: float = 10):
         super().__init__('car_C_keyboard')
         self.vel = vel
-        self.rotate_angle = 5
+        self.rotate_angle = 0.5
         self.rotate_speed = 15
 
         # Subscriber

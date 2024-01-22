@@ -38,8 +38,8 @@ setup(
             'carD_keyboard = pros_car_py.carD_keyboard:main',
             'carD_reader = pros_car_py.carD_serial_reader:main',
             'carD_writer = pros_car_py.carD_serial_writer:main',
-            'arm_reader = pros_arm_py.arm_reader:main',
-            'arm_writer = pros_arm_py.arm_writer:main',
+            'arm_reader = pros_car_py.arm_reader:main',
+            'arm_writer = pros_car_py.arm_writer:main',
         ],
     },
 )

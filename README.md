@@ -15,12 +15,12 @@ Advising professor:
 
 ## Car Type
 
-| Type | Description                            |
-| ---- | -------------------------------------- |
-| A    | Rear-wheel drive, front-wheel steering |
-| B    | Rear-wheel drive                       |
-| C    | Four-wheel drive                       |
-| D    | Mecanum wheel                          |
+| Type | Description                                                |
+| ---- | ---------------------------------------------------------- |
+| A    | Rear-wheel drive, front-wheel steering                     |
+| B    | Rear-wheel drive                                           |
+| C    | Four-wheel drive <font color=#0000FF>with robot arm</font> |
+| D    | Mecanum wheel                                              |
 
 
 
@@ -106,12 +106,13 @@ This will read the `Dockerfile` in the current directory.
 After building the image, execute the following command to run the image to become the desired container.
 
 ```bash
-docker run -it --rm --network host --privileged=true --env-file ./.env <username>/<projname>:<tagname> /bin/bash
+docker run -it --rm -v "$(pwd)/src:/workspaces/src" --device=/dev/usb_front_wheel --device=/dev/usb_rear_wheel --network host --env-file ./.env ghcr.io/otischung/pros_car:latest /bin/bash
 ```
 
 - `-i`: The container will get `stdin` from your keyboard.
 - `-t`: The container screen will show on your display monitor.
 - `--rm`: The container will be shut down automatically when detaching.
+- `-v "<host/location:/container/location>"`: Mount the host location into container.
 - `--network host`: All ports inside the container will be assigned to host ports.
 - `--privileged=true`: The user in the container will have all permissions, including read and write `ttyUSB*`. Or just type `--privileged`.
 - `--env-file`: This will pass the environment variables defined in the specific file to the container.
@@ -202,6 +203,7 @@ target_vel = [self._vel3, self._vel4]
   - You can run `ls /dev/ttyUSB*` to check your USB port number. 
     (if there doesn’t appear any USB devices, you must exit docker, and check the USB port on the car, `ttyUSB<0~3>` number depends on the inserted order)
   - We've defined <font color=#FF0000>the name of the soft link</font> for `usb_front_wheel`, `usb_rear_wheel`, and `usb_lidar` in [pros_app](https://github.com/otischung/pros_app). You may also use these rules in this container.
+  - [Referene](https://inegm.medium.com/persistent-names-for-usb-serial-devices-in-linux-dev-ttyusbx-dev-custom-name-fd49b5db9af1)
 
 - `car_models.py`
 

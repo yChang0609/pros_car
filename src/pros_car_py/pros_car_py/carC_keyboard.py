@@ -10,7 +10,7 @@ import threading
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectoryPoint
 from pros_car_py.env import *
-
+import math
 
 class CarCKeyboardController(Node):
     def __init__(self, stdscr, vel: float = 10):
@@ -141,6 +141,8 @@ class CarCKeyboardController(Node):
                         self.handle_key_n()
                     elif c == ord('m'):
                         self.handle_key_m()
+                    elif c == ord('b'):
+                        self.handle_key_b()
                     elif c == ord('q'):  # Exit on 'q'
                         self._direction = 90  # degree
                         self._vel1 = 0  # rad/s
@@ -241,63 +243,83 @@ class CarCKeyboardController(Node):
         pass
 
     #  機械手臂控制----------------
+    def clamp(self, value, min_value, max_value):
+        """限制值在一定範圍內"""
+        return max(min_value, min(value, max_value))
+
     def handle_key_l(self):
         self.stdscr.addstr(f"arm turn right")
-        self.joint_pos[0] += self.rotate_angle
+        # self.joint_pos[0] += self.rotate_angle
+        self.joint_pos[0] = self.clamp(self.joint_pos[0] - self.rotate_angle, 0, math.radians(180))
         pass
 
     def handle_key_j(self):
         self.stdscr.addstr(f"arm turn left")
-        self.joint_pos[0] -= self.rotate_angle
+        # self.joint_pos[0] -= self.rotate_angle
+        self.joint_pos[0] = self.clamp(self.joint_pos[0] + self.rotate_angle, 0, math.radians(180))
         pass
 
     def handle_key_i(self):
         self.stdscr.addstr(f"arm rift up")
-        self.joint_pos[1] += self.rotate_angle
+        # self.joint_pos[1] += self.rotate_angle
+        self.joint_pos[1] = self.clamp(self.joint_pos[1] - self.rotate_angle, math.radians(90), math.radians(120))
         pass
 
     def handle_key_k(self):
         self.stdscr.addstr(f"arm rift down")
-        self.joint_pos[1] -= self.rotate_angle
+        # self.joint_pos[1] -= self.rotate_angle
+        self.joint_pos[1] = self.clamp(self.joint_pos[1] + self.rotate_angle, math.radians(90), math.radians(120))
         pass
 
     def handle_key_y(self):
         self.stdscr.addstr(f"arm catch!")
-        self.joint_pos[2] += self.rotate_angle
+        # self.joint_pos[2] += self.rotate_angle
+        self.joint_pos[2] = self.clamp(self.joint_pos[2] - self.rotate_angle, math.radians(90), math.radians(150))
         pass
 
     def handle_key_h(self):
         self.stdscr.addstr(f"arm release!")
-        self.joint_pos[2] -= self.rotate_angle
+        # self.joint_pos[2] -= self.rotate_angle
+        self.joint_pos[2] = self.clamp(self.joint_pos[2] + self.rotate_angle, math.radians(90), math.radians(150))
         pass
 
     def handle_key_n(self):
         self.stdscr.addstr(f"arm release!")
-        self.joint_pos[3] -= self.rotate_angle
+        # self.joint_pos[3] -= self.rotate_angle
+        self.joint_pos[3] = self.clamp(self.joint_pos[3] + self.rotate_angle, math.radians(30), math.radians(130))
         pass
 
     def handle_key_m(self):
         self.stdscr.addstr(f"arm release!")
-        self.joint_pos[3] += self.rotate_angle
+        # self.joint_pos[3] += self.rotate_angle
+        self.joint_pos[3] = self.clamp(self.joint_pos[3] - self.rotate_angle, math.radians(30), math.radians(130))
         pass
 
     def handle_key_u(self):
         self.stdscr.addstr(f"arm j4 rotate left")
-        self.joint_pos[4] -= self.rotate_angle
+        # self.joint_pos[4] -= self.rotate_angle
+        self.joint_pos[4] = self.clamp(self.joint_pos[4] + self.rotate_angle, math.radians(50), math.radians(150))
         pass
 
     def handle_key_o(self):
         self.stdscr.addstr(f"arm j4 rotate right")
-        self.joint_pos[4] += self.rotate_angle
+        # self.joint_pos[4] += self.rotate_angle
+        self.joint_pos[4] = self.clamp(self.joint_pos[4] - self.rotate_angle, math.radians(50), math.radians(150))
         pass
 
+    
+    def handle_key_b(self):
+        # 初始化機器手臂到預設位置的方法
+        self.stdscr.addstr(f"將機器手臂初始化到預設位置...")
+        # self.joint_pos = [0.0, 1.57, 1.57, 0.52, 1.22]  # 以弧度表示的角度（0, 90, 90, 30, 70 度）
+        # self.pub_arm()
+        self.joint_pos = [0.0, math.radians(90), math.radians(90), math.radians(30), math.radians(70)]
+        
     def pub_arm(self):
         msg = JointTrajectoryPoint()
-        msg.positions = self.joint_pos  # Replace with actual desired positions
+        msg.positions = [float(pos) for pos in self.joint_pos]   # Replace with actual desired positions
         msg.velocities = [0.0, 0.0, 0.0, 0.0, 0.0]  # Replace with actual desired velocities
-        # You can set other fields of the JointTrajectoryPoint message similarly.
         self.joint_trajectory_publisher_.publish(msg)
-
 
 # ... Rest of your code, e.g. initializing rclpy and running the node
 def main(args=None):

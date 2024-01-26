@@ -317,7 +317,7 @@ class CarCKeyboardController(Node):
         
     def pub_arm(self):
         msg = JointTrajectoryPoint()
-        msg.positions = [float(pos) for pos in self.joint_pos]   # Replace with actual desired positions
+        msg.positions = [math.degrees(pos) for pos in self.joint_pos]   # Replace with actual desired positions
         msg.velocities = [0.0, 0.0, 0.0, 0.0, 0.0]  # Replace with actual desired velocities
         self.joint_trajectory_publisher_.publish(msg)
 

@@ -28,6 +28,10 @@ Advising professor:
 
 ![workflow_diagram](./img/workflow_diagram.png)
 
+## Deprecated Warning
+
+The image in this repository `pros_car` is deprecated. Use `pros_ai_image` instead.
+
 
 
 ## Feature

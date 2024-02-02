@@ -16,7 +16,7 @@ class CarCKeyboardController(Node):
     def __init__(self, stdscr, vel: float = 10):
         super().__init__('car_C_keyboard')
         self.vel = vel
-        self.rotate_angle = 0.5
+        self.rotate_angle = 0.1
         self.rotate_speed = 5
 
         # Subscriber
@@ -317,7 +317,8 @@ class CarCKeyboardController(Node):
         
     def pub_arm(self):
         msg = JointTrajectoryPoint()
-        msg.positions = [math.degrees(pos) for pos in self.joint_pos]   # Replace with actual desired positions
+        # msg.positions = [math.degrees(pos) for pos in self.joint_pos]   # Replace with actual desired positions
+        msg.positions = [float(pos) for pos in self.joint_pos]
         msg.velocities = [0.0, 0.0, 0.0, 0.0, 0.0]  # Replace with actual desired velocities
         self.joint_trajectory_publisher_.publish(msg)
 

@@ -16,7 +16,7 @@ class CarCKeyboardController(Node):
     def __init__(self, stdscr, vel: float = 10):
         super().__init__('car_C_keyboard')
         self.vel = vel
-        self.rotate_angle = 0.1
+        self.rotate_angle = math.radians(10.0) # 控制機械手臂每次移動的角度
         self.rotate_speed = 5
 
         # Subscriber
@@ -45,7 +45,7 @@ class CarCKeyboardController(Node):
             'joint_trajectory_point',
             10
         )
-        self.joint_pos = [1.57, 1.57, 1.57, 1.57, 1.0]
+        self.joint_pos = [1.57, 1.57, 1.57, 1.57, 1.4]
 
         self.stdscr = stdscr
         curses.noecho()
@@ -298,13 +298,13 @@ class CarCKeyboardController(Node):
     def handle_key_u(self):
         self.stdscr.addstr(f"arm j4 rotate left")
         # self.joint_pos[4] -= self.rotate_angle
-        self.joint_pos[4] = self.clamp(self.joint_pos[4] + self.rotate_angle, math.radians(50), math.radians(150))
+        self.joint_pos[4] = self.clamp(self.joint_pos[4] + self.rotate_angle, math.radians(100), math.radians(150))
         pass
 
     def handle_key_o(self):
         self.stdscr.addstr(f"arm j4 rotate right")
         # self.joint_pos[4] += self.rotate_angle
-        self.joint_pos[4] = self.clamp(self.joint_pos[4] - self.rotate_angle, math.radians(50), math.radians(150))
+        self.joint_pos[4] = self.clamp(self.joint_pos[4] - self.rotate_angle, math.radians(100), math.radians(150))
         pass
 
     
@@ -313,7 +313,7 @@ class CarCKeyboardController(Node):
         self.stdscr.addstr(f"將機器手臂初始化到預設位置...")
         # self.joint_pos = [0.0, 1.57, 1.57, 0.52, 1.22]  # 以弧度表示的角度（0, 90, 90, 30, 70 度）
         # self.pub_arm()
-        self.joint_pos = [0.0, math.radians(90), math.radians(90), math.radians(30), math.radians(70)]
+        self.joint_pos = [math.radians(90), math.radians(90), math.radians(90), math.radians(30), math.radians(70)]
         
     def pub_arm(self):
         msg = JointTrajectoryPoint()

@@ -17,7 +17,7 @@ class CarCKeyboardController(Node):
         super().__init__('car_C_keyboard')
         self.vel = vel
         self.rotate_angle = math.radians(10.0) # 控制機械手臂每次移動的角度
-        self.rotate_speed = 5
+        self.rotate_speed = 15
 
         # Subscriber
         self.subscription = self.create_subscription(

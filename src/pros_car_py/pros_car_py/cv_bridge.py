@@ -1,9 +1,12 @@
 import rclpy
+import curses
+import threading
 from rclpy.node import Node
-from sensor_msgs.msg import CompressedImage
+from sensor_msgs.msg import CompressedImage, Image
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
+import sys
 
 
 class ImageToVideoConverter(Node):
@@ -15,23 +18,34 @@ class ImageToVideoConverter(Node):
             CompressedImage,
             '/out/compressed',
             self.image_callback,
-            10
+            2147483647
         )
+        # self.subscription = self.create_subscription(
+        #     Image,
+        #     '/camera/color/image_raw',
+        #     self.image_callback,
+        #     2147483647
+        # )
         self.video_writer = None
+        self.cv_image = None
+        print("FINISH constructor", file=sys.stderr)
 
     def image_callback(self, msg):
-        print("REACH HERE")
+        print("REACH image callback", file=sys.stderr)
         try:
-            np_arr = np.frombuffer(msg.data, np.uint8)
-            cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            if self.video_writer is None:
-                self.init_video_writer(cv_image)
-            self.video_writer.write(cv_image)
-            cv2.imshow('Robot Arm', cv_image)
+            self.cv_image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            # self.cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+            # print(self.cv_image, file=sys.stderr)
+
+            cv2.imshow('Robot Arm', self.cv_image)
             key = cv2.waitKey(1)
-            if key == 27:  # esc
-                cv2.destroyAllWindows()
-                return
+
+            if self.video_writer is None:
+                self.init_video_writer(self.cv_image)
+            self.video_writer.write(self.cv_image)
+        except CvBridgeError as e:
+            self.get_logger().error('CvBridge Error: %s' % str(e))
         except Exception as e:
             self.get_logger().error('Error processing image: %s' % str(e))
 
@@ -51,12 +65,38 @@ class ImageToVideoConverter(Node):
             self.video_writer.release()
         super().destroy_node()
 
+    def display_video(self):
+        if self.cv_image is None:
+            print("Error, there is no image.", file=sys.stderr)
+        # while True:
+        #     cv2.imshow('Robot Arm', self.cv_image)
+        #     key = cv2.waitKey(1)
+        #     if key == 27:  # esc
+        #         cv2.destroyAllWindows()
+        #         break
+
 
 def main(args=None):
     rclpy.init(args=args)
-    image_to_video_converter = ImageToVideoConverter()
-    rclpy.spin(image_to_video_converter)
-    image_to_video_converter.destroy_node()
+    stdscr = curses.initscr()
+    node = ImageToVideoConverter()
+    """
+    Note:
+    - If you use multithreading, you will encounter sync problem.
+        That is, the image is OK in constructor, but is None in other threads.
+    """
+    # # Spin the node in a separate thread
+    # spin_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+    # spin_thread.start()
+    #
+    # try:
+    #     node.display_video()
+    # finally:
+    #     curses.endwin()
+    #     node.get_logger().info(f'Quit keyboard!')
+    #     rclpy.shutdown()
+    #     spin_thread.join()  # Ensure the spin thread is cleanly stopped
+    rclpy.spin(node)
     rclpy.shutdown()
 
 

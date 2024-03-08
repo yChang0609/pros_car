@@ -1,12 +1,12 @@
-import rclpy
 import curses
-import threading
-from rclpy.node import Node
-from sensor_msgs.msg import CompressedImage, Image
-from cv_bridge import CvBridge
 import cv2
 import numpy as np
+import rclpy
 import sys
+import threading
+from cv_bridge import CvBridge
+from rclpy.node import Node
+from sensor_msgs.msg import CompressedImage, Image
 
 
 class ImageToVideoConverter(Node):

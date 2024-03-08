@@ -9,17 +9,45 @@ from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
 
-class ImageToVideoConverter(Node):
+class NodeVideoReader(Node):
+    """
+    A class subscribes an ROS topic to read the compressed video and then show the video.
+
+    Attributes
+    ----------
+    bridge : CvBridge
+        The instance of the class CvBridge use to convert the ROS image to OpenCV image.
+    subscription : Subscription
+        The ROS subscription.
+    video_writer
+        The opencv video writer.
+    cv_image: cv::Mat
+        The opencv format image.
+
+    Methods
+    -------
+    image_callback(msg: cv::Mat)
+        The trigger function of the subscription.
+        It reads the compressed image, converts to OpenCV format,
+        shows the video and create video writer.
+    init_video_writer(image: cv::Mat)
+        Initialize the video writer.
+    destroy_node()
+        Destroy the ROS node.
+    """
+
     # https://stackoverflow.com/questions/76537425/how-to-export-image-and-video-data-from-a-bag-file-in-ros2
     def __init__(self):
         super().__init__('image_to_video_converter')
         self.bridge = CvBridge()
+        # Subscribe the compressed image.
         self.subscription = self.create_subscription(
             CompressedImage,
             '/out/compressed',
             self.image_callback,
             2147483647
         )
+        # # Subscribe the raw image.
         # self.subscription = self.create_subscription(
         #     Image,
         #     '/camera/color/image_raw',
@@ -65,21 +93,11 @@ class ImageToVideoConverter(Node):
             self.video_writer.release()
         super().destroy_node()
 
-    def display_video(self):
-        if self.cv_image is None:
-            print("Error, there is no image.", file=sys.stderr)
-        # while True:
-        #     cv2.imshow('Robot Arm', self.cv_image)
-        #     key = cv2.waitKey(1)
-        #     if key == 27:  # esc
-        #         cv2.destroyAllWindows()
-        #         break
-
 
 def main(args=None):
     rclpy.init(args=args)
     stdscr = curses.initscr()
-    node = ImageToVideoConverter()
+    node = NodeVideoReader()
     """
     Note:
     - If you use multithreading, you will encounter sync problem.

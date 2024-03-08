@@ -226,3 +226,19 @@ target_vel = [self._vel3, self._vel4]
   ros2 run pros_car_py car<A~D>_keyboard.py
   ```
 
+
+
+## GTK in Docker
+
+If you want to show GUI in docker, you need to configure your host first.
+
+```bash
+xhost +
+```
+
+And then run your docker image by the following command:
+
+```bash
+docker run -it --rm -v "$(pwd)/src:/workspaces/src" --network pros_app_my_bridge_network  --env-file ./.env -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=$DISPLAY ghcr.io/otischung/pros_ai_image:latest /bin/bash
+```
+

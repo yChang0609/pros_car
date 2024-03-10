@@ -1,5 +1,6 @@
 import curses
 import cv2
+import mediapipe
 import numpy as np
 import rclpy
 import sys
@@ -93,6 +94,16 @@ class NodeVideoReader(Node):
             self.video_writer.release()
         super().destroy_node()
 
+
+class Mediapipe:
+    def __init__(self):
+        self.mpPose = mp.solutions.pose
+        self.pose = mpPose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5, static_image_mode=False,
+                           model_complexity=1)
+
+        self.mpDraw = mp.solutions.drawing_utils
+        self.poseLmsStyle = mpDraw.DrawingSpec(color=(0, 0, 0), thickness=3)
+        self.poseConStyle = mpDraw.DrawingSpec(color=(255, 255, 255), thickness=5)
 
 def main(args=None):
     rclpy.init(args=args)

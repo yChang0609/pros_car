@@ -15,12 +15,12 @@ Advising professor:
 
 ## Car Type
 
-| Type | Description                                                |
-| ---- | ---------------------------------------------------------- |
-| A    | Rear-wheel drive, front-wheel steering                     |
-| B    | Rear-wheel drive                                           |
-| C    | Four-wheel drive <font color=#0000FF>with robot arm</font> |
-| D    | Mecanum wheel                                              |
+| Type                         | Description                                                |
+| ---------------------------- | ---------------------------------------------------------- |
+| A                            | Rear-wheel drive, front-wheel steering                     |
+| B                            | Rear-wheel drive                                           |
+| <font color=#0000FF>C</font> | Four-wheel drive <font color=#0000FF>with robot arm</font> |
+| D                            | Mecanum wheel                                              |
 
 
 
@@ -32,6 +32,8 @@ Advising professor:
 
 The image in this repository `pros_car` is deprecated. Use `pros_ai_image` instead.
 
+The Dockerfile here is to test new feature based on `ghcr.io/otischung/pros_ai_image:latest`.
+
 
 
 ## Feature
@@ -42,6 +44,9 @@ The docker image in this project has the following 4 features shown above.
 - `Car_<A,B,C,D>_serial_reader`
 - `Car_<A,B,C,D>_serial_writer`
 - `RandomAI`
+- `arm_reader`
+- `arm_writer`
+- `cv_bridge`: Convert the compressed ROS image to OpenCV image format.
 
 
 
@@ -55,7 +60,7 @@ The docker image in this project has the following 4 features shown above.
 
 [pros_AI](https://github.com/otischung/pros_AI) contains `Car_B_AI`.
 
-[pros_AI_image](https://github.com/otischung/pros_AI_image) contains the docker image used by pros_AI.
+[pros_AI_image](https://github.com/otischung/pros_AI_image) is the repository which creates the entire base docker image.
 
 
 
@@ -63,7 +68,7 @@ The docker image in this project has the following 4 features shown above.
 
 ## Docker
 
-### GitLab Repository
+### GitHub Repository
 
 You can clone it by using HTTPS
 
@@ -88,20 +93,8 @@ usermod -a -G docker <username>
 You can pull the docker image by the following command. This image is automatically built by GitHub Actions CI and it contains two versions of OS type, including amd64 and arm64.
 
 ```bash
- docker pull ghcr.io/otischung/pros_car:latest
+ docker pull ghcr.io/otischung/pros_ai_image:latest
 ```
-
-
-
-### Build Image (Optional)
-
-After successfully pulling the GitHub repository, you can build your image by executing the following command.
-
-```jsx
-docker build -t <username>/<projname>:<tagname> .
-```
-
-This will read the `Dockerfile` in the current directory.
 
 
 
@@ -110,17 +103,16 @@ This will read the `Dockerfile` in the current directory.
 After building the image, execute the following command to run the image to become the desired container.
 
 ```bash
-docker run -it --rm -v "$(pwd)/src:/workspaces/src" --device=/dev/usb_front_wheel --device=/dev/usb_rear_wheel --network host --env-file ./.env ghcr.io/otischung/pros_car:latest /bin/bash
+docker run -it --rm -v "$(pwd)/src:/workspaces/src" --network pros_app_my_bridge_network --device=/dev/usb_front_wheel --device=/dev/usb_rear_wheel --device=/dev/usb_robot_arm  --env-file ./.env ghcr.io/otischung/pros_ai_image:latest /bin/bash
 ```
 
 - `-i`: The container will get `stdin` from your keyboard.
 - `-t`: The container screen will show on your display monitor.
 - `--rm`: The container will be shut down automatically when detaching.
 - `-v "<host/location:/container/location>"`: Mount the host location into container.
-- `--network host`: All ports inside the container will be assigned to host ports.
-- `--privileged=true`: The user in the container will have all permissions, including read and write `ttyUSB*`. Or just type `--privileged`.
+- `--network <network_name>`: Use the network you provided. We use bridge netowrk here. You can see all docker netowrk with `docker network ls`.
 - `--env-file`: This will pass the environment variables defined in the specific file to the container.
-- In the end, tell the container what type of terminal should be opened. We use `bash` in this case.
+- In the end, tell the container what program should be executed. We use `bash` in this case.
 
 
 
@@ -131,6 +123,8 @@ We've written 2 shell scripts to run the image.
 > car_control_2.sh
 >
 > car_control_4.sh
+>
+> mediapipe.sh
 
 
 
@@ -236,3 +230,20 @@ target_vel = [self._vel3, self._vel4]
   ros2 run pros_car_py car<A~D>_keyboard.py
   ```
 
+
+
+## GTK in Docker
+
+If you want to show GUI in docker, you need to configure your host first.
+
+```bash
+xhost +
+```
+
+And then run your docker image by the following command:
+
+```bash
+docker run -it --rm -v "$(pwd)/src:/workspaces/src" --network pros_app_my_bridge_network  --env-file ./.env -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=$DISPLAY ghcr.io/otischung/pros_ai_image:latest /bin/bash
+```
+
+We've written the code above into `mediapipe.sh`.

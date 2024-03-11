@@ -1,6 +1,7 @@
 import curses
 import cv2
-import mediapipe
+import math
+import mediapipe as mp
 import numpy as np
 import rclpy
 import sys
@@ -8,6 +9,27 @@ import threading
 from cv_bridge import CvBridge, CvBridgeError
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
+
+
+def dotproduct(v1, v2):
+    result = sum((a * b) for a, b in zip(v1, v2))
+    if result > 1:
+        result = 1
+    elif result < -1:
+        result = -1
+    return result
+
+
+def cross(v1, v2):
+    return np.cross(v1, v2)
+
+
+def length(v):
+    return math.sqrt(dotproduct(v, v))
+
+
+def angle(v1, v2):
+    return math.acos(dotproduct(v1, v2) / (length(v1) * length(v2)))
 
 
 class NodeVideoReader(Node):
@@ -57,37 +79,31 @@ class NodeVideoReader(Node):
         # )
         self.video_writer = None
         self.cv_image = None
+        self.mediapipe = Mediapipe()
 
     def image_callback(self, msg):
         try:
             self.cv_image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
             # self.cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-            cv2.imshow('Robot Arm', self.cv_image)
-            key = cv2.waitKey(1)
-            if key == 27:  # esc
-                cv2.destroyAllWindows()
+            # # Show video directly
+            # cv2.imshow('Robot Arm', self.cv_image)
+            # key = cv2.waitKey(1)
+            # if key == 27:  # esc
+            #     cv2.destroyAllWindows()
+            #     self.destroy_node()
+            #     quit(0)
+
+            # Use mediapipe
+            stop = self.mediapipe.draw_pose(self.cv_image)
+            if stop:
                 self.destroy_node()
                 quit(0)
 
-            # if self.video_writer is None:
-            #     self.init_video_writer(self.cv_image)
-            # self.video_writer.write(self.cv_image)
         except CvBridgeError as e:
             self.get_logger().error('CvBridge Error: %s' % str(e))
         except Exception as e:
             self.get_logger().error('Error processing image: %s' % str(e))
-
-    # def init_video_writer(self, image):
-    #     try:
-    #         height, width, _ = image.shape
-    #         video_format = 'mp4'  # or any other video format supported by OpenCV
-    #         video_filename = 'output_video.' + video_format
-    #         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    #         fps = 30  # Frames per second
-    #         self.video_writer = cv2.VideoWriter(video_filename, fourcc, fps, (width, height))
-    #     except Exception as e:
-    #         self.get_logger().error('Error initializing video writer: %s' % str(e))
 
     def destroy_node(self):
         if self.video_writer is not None:
@@ -98,19 +114,27 @@ class NodeVideoReader(Node):
 class Mediapipe:
     def __init__(self):
         self.mpPose = mp.solutions.pose
-        self.pose = mpPose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5, static_image_mode=False,
-                                model_complexity=1)
+        self.pose = self.mpPose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5, static_image_mode=False,
+                                     model_complexity=1)
 
         self.mpDraw = mp.solutions.drawing_utils
-        self.poseLmsStyle = mpDraw.DrawingSpec(color=(0, 0, 0), thickness=3)
-        self.poseConStyle = mpDraw.DrawingSpec(color=(255, 255, 255), thickness=5)
+        self.poseLmsStyle = self.mpDraw.DrawingSpec(color=(0, 0, 0), thickness=3)
+        self.poseConStyle = self.mpDraw.DrawingSpec(color=(255, 255, 255), thickness=5)
 
-    def draw_pose(self, img):
+    def draw_pose(self, img) -> bool:
+        angle1, a1_last, a1_f = 0, 0, 0
+        angle2, a2_last, a2_f = 0, 0, 0
+        angle3, a3_last, a3_f = 0, 0, 0
+        angle4, a4_last, a4_f = 0, 0, 0
+        angle5, a5_last, a5_f = 0, 0, 0
+        angle6, a6_last, a6_f = 0, 0, 0
+        log_file = "/workspaces/src/video.txt"
+
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        result = pose.process(imgRGB)
+        result = self.pose.process(imgRGB)
 
         if result.pose_landmarks:
-            mpDraw.draw_landmarks(img, result.pose_landmarks, mpPose.POSE_CONNECTIONS)
+            self.mpDraw.draw_landmarks(img, result.pose_landmarks, self.mpPose.POSE_CONNECTIONS)
             joint = ''
             joint_list = []
             for data_point in result.pose_landmarks.landmark:
@@ -276,20 +300,23 @@ class Mediapipe:
 
             send_ = str(a1_f) + ';' + str(a2_f) + ';' + str(a3_f) + ';' + str(a4_f) + ';' + str(a5_f) + ';' + str(a6_f)
             if send_2 and send_3 and send_5 > 0:
-                send_socket.sendto((str(send_)).encode(), (UDP_IP, UDP_SEND_PORT))
+                # send_socket.sendto((str(send_)).encode(), (UDP_IP, UDP_SEND_PORT))
                 print('-----send:', send_)
                 send_switch = 0
                 # message, address = receive_socket.recvfrom(1024)
                 # msg = message.decode().split(";")
                 # jRot = [msg[0], msg[1], msg[2], msg[3], msg[4], msg[5]]
                 # print("receive: ", jRot)
-                with open(txt_name, 'a') as file:
+                with open(log_file, 'a') as file:
                     file.write(send_)
                     file.write('\n')
 
-        out.write(img)
         cv2.imshow('Robot Arm', img)
         key = cv2.waitKey(1)
+        if key == 27:  # esc
+            cv2.destroyAllWindows()
+            return True
+        return False
 
 
 def main(args=None):

@@ -15,12 +15,12 @@ Advising professor:
 
 ## Car Type
 
-| Type | Description                                                |
-| ---- | ---------------------------------------------------------- |
-| A    | Rear-wheel drive, front-wheel steering                     |
-| B    | Rear-wheel drive                                           |
-| C    | Four-wheel drive <font color=#0000FF>with robot arm</font> |
-| D    | Mecanum wheel                                              |
+| Type                         | Description                                                |
+| ---------------------------- | ---------------------------------------------------------- |
+| A                            | Rear-wheel drive, front-wheel steering                     |
+| B                            | Rear-wheel drive                                           |
+| <font color=#0000FF>C</font> | Four-wheel drive <font color=#0000FF>with robot arm</font> |
+| D                            | Mecanum wheel                                              |
 
 
 
@@ -31,6 +31,8 @@ Advising professor:
 ## Deprecated Warning
 
 The image in this repository `pros_car` is deprecated. Use `pros_ai_image` instead.
+
+The Dockerfile here is to test new feature based on `ghcr.io/otischung/pros_ai_image:latest`.
 
 
 
@@ -58,7 +60,7 @@ The docker image in this project has the following 4 features shown above.
 
 [pros_AI](https://github.com/otischung/pros_AI) contains `Car_B_AI`.
 
-[pros_AI_image](https://github.com/otischung/pros_AI_image) contains the docker image used by pros_AI.
+[pros_AI_image](https://github.com/otischung/pros_AI_image) is the repository which creates the entire base docker image.
 
 
 
@@ -121,6 +123,8 @@ We've written 2 shell scripts to run the image.
 > car_control_2.sh
 >
 > car_control_4.sh
+>
+> mediapipe.sh
 
 
 
@@ -242,3 +246,4 @@ And then run your docker image by the following command:
 docker run -it --rm -v "$(pwd)/src:/workspaces/src" --network pros_app_my_bridge_network  --env-file ./.env -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=$DISPLAY ghcr.io/otischung/pros_ai_image:latest /bin/bash
 ```
 
+We've written the code above into `mediapipe.sh`.

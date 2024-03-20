@@ -9,6 +9,7 @@ import threading
 from cv_bridge import CvBridge, CvBridgeError
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
+from trajectory_msgs.msg import JointTrajectoryPoint
 
 
 def dotproduct(v1, v2):
@@ -63,6 +64,8 @@ class NodeVideoReader(Node):
     def __init__(self):
         super().__init__('image_to_video_converter')
         self.bridge = CvBridge()
+        # The angles for robot arm.
+        self.joint_pos = [1.57, 1.57, 1.57, 1.57, 1.4]
         # Subscribe the compressed image.
         self.subscription = self.create_subscription(
             CompressedImage,
@@ -77,6 +80,13 @@ class NodeVideoReader(Node):
         #     self.image_callback,
         #     2147483647
         # )
+
+        # Publish the angles for robot arm.
+        self.joint_trajectory_publisher_ = self.create_publisher(
+            JointTrajectoryPoint,
+            'joint_trajectory_point',
+            10
+        )
         self.video_writer = None
         self.cv_image = None
         self.mediapipe = Mediapipe()
@@ -95,15 +105,23 @@ class NodeVideoReader(Node):
             #     quit(0)
 
             # Use mediapipe
-            stop = self.mediapipe.draw_pose(self.cv_image)
+            stop, *self.joint_pos = self.mediapipe.draw_pose(self.cv_image)
             if stop:
                 self.destroy_node()
                 quit(0)
+            self.pub_arm()
 
         except CvBridgeError as e:
             self.get_logger().error('CvBridge Error: %s' % str(e))
         except Exception as e:
             self.get_logger().error('Error processing image: %s' % str(e))
+
+    def pub_arm(self):
+        msg = JointTrajectoryPoint()
+        # msg.positions = [math.degrees(pos) for pos in self.joint_pos]   # Replace with actual desired positions
+        msg.positions = [float(pos) for pos in self.joint_pos]
+        msg.velocities = [0.0, 0.0, 0.0, 0.0, 0.0]  # Replace with actual desired velocities
+        self.joint_trajectory_publisher_.publish(msg)
 
     def destroy_node(self):
         if self.video_writer is not None:
@@ -121,7 +139,7 @@ class Mediapipe:
         self.poseLmsStyle = self.mpDraw.DrawingSpec(color=(0, 0, 0), thickness=3)
         self.poseConStyle = self.mpDraw.DrawingSpec(color=(255, 255, 255), thickness=5)
 
-    def draw_pose(self, img) -> bool:
+    def draw_pose(self, img) -> tuple(bool, float, float, float, float, float):
         angle1, a1_last, a1_f = 0, 0, 0
         angle2, a2_last, a2_f = 0, 0, 0
         angle3, a3_last, a3_f = 0, 0, 0
@@ -315,8 +333,8 @@ class Mediapipe:
         key = cv2.waitKey(1)
         if key == 27:  # esc
             cv2.destroyAllWindows()
-            return True
-        return False
+            return True, a1_f, a2_f, a3_f, a4_f, a5_f
+        return False, a1_f, a2_f, a3_f, a4_f, a5_f
 
 
 def main(args=None):

@@ -139,7 +139,7 @@ class Mediapipe:
         self.poseLmsStyle = self.mpDraw.DrawingSpec(color=(0, 0, 0), thickness=3)
         self.poseConStyle = self.mpDraw.DrawingSpec(color=(255, 255, 255), thickness=5)
 
-    def draw_pose(self, img) -> tuple(bool, float, float, float, float, float):
+    def draw_pose(self, img) -> tuple([bool, float, float, float, float, float]):
         angle1, a1_last, a1_f = 0, 0, 0
         angle2, a2_last, a2_f = 0, 0, 0
         angle3, a3_last, a3_f = 0, 0, 0
@@ -152,7 +152,7 @@ class Mediapipe:
         result = self.pose.process(imgRGB)
 
         if result.pose_landmarks:
-            self.mpDraw.draw_landmarks(img, result.pose_landmarks, self.mpPose.POSE_CONNECTIONS)
+            # self.mpDraw.draw_landmarks(img, result.pose_landmarks, self.mpPose.POSE_CONNECTIONS)
             joint = ''
             joint_list = []
             for data_point in result.pose_landmarks.landmark:

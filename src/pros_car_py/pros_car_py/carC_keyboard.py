@@ -17,7 +17,7 @@ class CarCKeyboardController(Node):
         super().__init__('car_C_keyboard')
         self.vel = vel
         self.rotate_angle = math.radians(10.0) # 控制機械手臂每次移動的角度
-        self.rotate_speed = 15
+        self.rotate_speed = vel
 
         # Subscriber
         self.subscription = self.create_subscription(
@@ -307,14 +307,14 @@ class CarCKeyboardController(Node):
         self.joint_pos[4] = self.clamp(self.joint_pos[4] - self.rotate_angle, math.radians(60), math.radians(100))
         pass
 
-    
+
     def handle_key_b(self):
         # 初始化機器手臂到預設位置的方法
         self.stdscr.addstr(f"將機器手臂初始化到預設位置...")
         # self.joint_pos = [0.0, 1.57, 1.57, 0.52, 1.22]  # 以弧度表示的角度（0, 90, 90, 30, 70 度）
         # self.pub_arm()
         self.joint_pos = [math.radians(90), math.radians(90), math.radians(90), math.radians(30), math.radians(80)]
-        
+
     def pub_arm(self):
         msg = JointTrajectoryPoint()
         # msg.positions = [math.degrees(pos) for pos in self.joint_pos]   # Replace with actual desired positions

@@ -45,7 +45,7 @@ class CarCKeyboardController(Node):
             'joint_trajectory_point',
             10
         )
-        self.joint_pos = [1.57, 1.57, 1.57, 1.57, 1.4]
+        self.joint_pos = [1.57, 0.0, 2.79, 0.87, 0.17]
 
         self.stdscr = stdscr
         curses.noecho()
@@ -262,49 +262,49 @@ class CarCKeyboardController(Node):
     def handle_key_i(self):
         self.stdscr.addstr(f"arm rift up")
         # self.joint_pos[1] += self.rotate_angle
-        self.joint_pos[1] = self.clamp(self.joint_pos[1] - self.rotate_angle, math.radians(90), math.radians(120))
+        self.joint_pos[1] = self.clamp(self.joint_pos[1] - self.rotate_angle, math.radians(0), math.radians(180))
         pass
 
     def handle_key_k(self):
         self.stdscr.addstr(f"arm rift down")
         # self.joint_pos[1] -= self.rotate_angle
-        self.joint_pos[1] = self.clamp(self.joint_pos[1] + self.rotate_angle, math.radians(90), math.radians(120))
+        self.joint_pos[1] = self.clamp(self.joint_pos[1] + self.rotate_angle, math.radians(0), math.radians(180))
         pass
 
     def handle_key_y(self):
         self.stdscr.addstr(f"arm catch!")
         # self.joint_pos[2] += self.rotate_angle
-        self.joint_pos[2] = self.clamp(self.joint_pos[2] - self.rotate_angle, math.radians(90), math.radians(150))
+        self.joint_pos[2] = self.clamp(self.joint_pos[2] - self.rotate_angle, math.radians(0), math.radians(150))
         pass
 
     def handle_key_h(self):
         self.stdscr.addstr(f"arm release!")
         # self.joint_pos[2] -= self.rotate_angle
-        self.joint_pos[2] = self.clamp(self.joint_pos[2] + self.rotate_angle, math.radians(90), math.radians(150))
+        self.joint_pos[2] = self.clamp(self.joint_pos[2] + self.rotate_angle, math.radians(0), math.radians(150))
         pass
 
     def handle_key_n(self):
         self.stdscr.addstr(f"arm release!")
         # self.joint_pos[3] -= self.rotate_angle
-        self.joint_pos[3] = self.clamp(self.joint_pos[3] + self.rotate_angle, math.radians(30), math.radians(130))
+        self.joint_pos[3] = self.clamp(self.joint_pos[3] + self.rotate_angle, math.radians(50), math.radians(180))
         pass
 
     def handle_key_m(self):
         self.stdscr.addstr(f"arm release!")
         # self.joint_pos[3] += self.rotate_angle
-        self.joint_pos[3] = self.clamp(self.joint_pos[3] - self.rotate_angle, math.radians(30), math.radians(130))
+        self.joint_pos[3] = self.clamp(self.joint_pos[3] - self.rotate_angle, math.radians(50), math.radians(180))
         pass
 
     def handle_key_u(self):
         self.stdscr.addstr(f"arm j4 rotate left")
         # self.joint_pos[4] -= self.rotate_angle
-        self.joint_pos[4] = self.clamp(self.joint_pos[4] + self.rotate_angle, math.radians(60), math.radians(100))
+        self.joint_pos[4] = self.clamp(self.joint_pos[4] + self.rotate_angle, math.radians(0), math.radians(70))
         pass
 
     def handle_key_o(self):
         self.stdscr.addstr(f"arm j4 rotate right")
         # self.joint_pos[4] += self.rotate_angle
-        self.joint_pos[4] = self.clamp(self.joint_pos[4] - self.rotate_angle, math.radians(60), math.radians(100))
+        self.joint_pos[4] = self.clamp(self.joint_pos[4] - self.rotate_angle, math.radians(0), math.radians(70))
         pass
 
 
@@ -313,7 +313,7 @@ class CarCKeyboardController(Node):
         self.stdscr.addstr(f"將機器手臂初始化到預設位置...")
         # self.joint_pos = [0.0, 1.57, 1.57, 0.52, 1.22]  # 以弧度表示的角度（0, 90, 90, 30, 70 度）
         # self.pub_arm()
-        self.joint_pos = [math.radians(90), math.radians(90), math.radians(90), math.radians(30), math.radians(80)]
+        self.joint_pos = [math.radians(90), math.radians(0), math.radians(160), math.radians(50), math.radians(10)]
 
     def pub_arm(self):
         msg = JointTrajectoryPoint()

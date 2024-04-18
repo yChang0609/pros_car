@@ -220,18 +220,18 @@ class CarCKeyboardController(Node):
 
     def handle_key_e(self, vel: float = 10):
         self.stdscr.addstr(f"car go clockwise")
-        self._vel1 = self.rotate_speed  # rad/s
-        self._vel2 = -self.rotate_speed  # rad/s
-        self._vel3 = self.rotate_speed  # rad/s
-        self._vel4 = -self.rotate_speed  # rad/s
-        pass
-
-    def handle_key_r(self, vel: float = 10):
-        self.stdscr.addstr(f"car go counterclockwise")
         self._vel1 = -self.rotate_speed  # rad/s
         self._vel2 = self.rotate_speed  # rad/s
         self._vel3 = -self.rotate_speed  # rad/s
         self._vel4 = self.rotate_speed  # rad/s
+        pass
+
+    def handle_key_r(self, vel: float = 10):
+        self.stdscr.addstr(f"car go counterclockwise")
+        self._vel1 = self.rotate_speed  # rad/s
+        self._vel2 = -self.rotate_speed  # rad/s
+        self._vel3 = self.rotate_speed  # rad/s
+        self._vel4 = -self.rotate_speed  # rad/s
         pass
 
     def handle_key_z(self):
@@ -307,14 +307,14 @@ class CarCKeyboardController(Node):
         self.joint_pos[4] = self.clamp(self.joint_pos[4] - self.rotate_angle, math.radians(60), math.radians(100))
         pass
 
-    
+
     def handle_key_b(self):
         # 初始化機器手臂到預設位置的方法
         self.stdscr.addstr(f"將機器手臂初始化到預設位置...")
         # self.joint_pos = [0.0, 1.57, 1.57, 0.52, 1.22]  # 以弧度表示的角度（0, 90, 90, 30, 70 度）
         # self.pub_arm()
         self.joint_pos = [math.radians(90), math.radians(90), math.radians(90), math.radians(30), math.radians(80)]
-        
+
     def pub_arm(self):
         msg = JointTrajectoryPoint()
         # msg.positions = [math.degrees(pos) for pos in self.joint_pos]   # Replace with actual desired positions

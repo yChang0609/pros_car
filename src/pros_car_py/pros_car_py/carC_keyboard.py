@@ -220,18 +220,18 @@ class CarCKeyboardController(Node):
 
     def handle_key_e(self, vel: float = 10):
         self.stdscr.addstr(f"car go clockwise")
-        self._vel1 = self.rotate_speed  # rad/s
-        self._vel2 = -self.rotate_speed  # rad/s
-        self._vel3 = self.rotate_speed  # rad/s
-        self._vel4 = -self.rotate_speed  # rad/s
-        pass
-
-    def handle_key_r(self, vel: float = 10):
-        self.stdscr.addstr(f"car go counterclockwise")
         self._vel1 = -self.rotate_speed  # rad/s
         self._vel2 = self.rotate_speed  # rad/s
         self._vel3 = -self.rotate_speed  # rad/s
         self._vel4 = self.rotate_speed  # rad/s
+        pass
+
+    def handle_key_r(self, vel: float = 10):
+        self.stdscr.addstr(f"car go counterclockwise")
+        self._vel1 = self.rotate_speed  # rad/s
+        self._vel2 = -self.rotate_speed  # rad/s
+        self._vel3 = self.rotate_speed  # rad/s
+        self._vel4 = -self.rotate_speed  # rad/s
         pass
 
     def handle_key_z(self):
@@ -314,6 +314,7 @@ class CarCKeyboardController(Node):
         # self.joint_pos = [0.0, 1.57, 1.57, 0.52, 1.22]  # 以弧度表示的角度（0, 90, 90, 30, 70 度）
         # self.pub_arm()
         self.joint_pos = [math.radians(90), math.radians(0), math.radians(160), math.radians(50), math.radians(10)]
+
 
     def pub_arm(self):
         msg = JointTrajectoryPoint()

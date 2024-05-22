@@ -14,7 +14,7 @@ class CarCSerialReader(Node):
 
         serial_port = self.declare_parameter('serial_port', SERIAL_DEV_DEFAULT).value
         serial_port_forward = self.declare_parameter('serial_port_forward', SERIAL_DEV_FORWARD_DEFAULT).value
-        
+
         self._serial = Serial(serial_port, 115200, timeout=0)
         self._serial_forward = Serial(serial_port_forward, 115200, timeout=0)
 
@@ -29,7 +29,6 @@ class CarCSerialReader(Node):
             DeviceDataTypeEnum.car_C_state_front,
             10
         )
-
 
         # Create a timer to read from the serial port and publish state every 100 ms
         self.timer = self.create_timer(0.01, self.timer_callback)
@@ -78,6 +77,7 @@ class CarCSerialReader(Node):
                 self.publisher_forward.publish(state_msg)
             except orjson.JSONDecodeError as e:
                 self.get_logger().error(f'JSON decode error: {e}')
+
 
 def main(args=None):
     rclpy.init(args=args)

@@ -28,14 +28,9 @@ class StringEnum(str, Enum):
 class DeviceDataTypeEnum(StringEnum):
     car_A_state = auto()
     car_A_control = auto()
-    car_B_state = auto()
-    car_B_control = auto()
     car_C_state = auto()
     car_C_state_front = auto()
     car_C_control = auto()
-    car_D_state = auto()
-    car_D_state_front = auto()
-    car_D_control = auto()
 
 
 class DeviceData(pydantic.BaseModel):
@@ -54,30 +49,12 @@ class CarAControl(pydantic.BaseModel):
     direction: int = 90
 
 
-class CarBState(pydantic.BaseModel):
-    vels: List[float] = []
-    encoders: List[int] = []
-
-
-class CarBControl(pydantic.BaseModel):
-    target_vel: List[float] = []
-
-
 class CarCState(pydantic.BaseModel):
     vels: List[float] = []
     encoders: List[int] = []
 
 
 class CarCControl(pydantic.BaseModel):
-    target_vel: List[float] = []
-
-
-class CarDState(pydantic.BaseModel):
-    vels: List[float] = []
-    encoders: List[int] = []
-
-
-class CarDControl(pydantic.BaseModel):
     target_vel: List[float] = []
 
 

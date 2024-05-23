@@ -12,6 +12,7 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 from pros_car_py.env import *
 import math
 
+
 class CarCKeyboardController(Node):
     def __init__(self, stdscr, vel: float = 10):
         super().__init__('car_C_keyboard')
@@ -307,7 +308,6 @@ class CarCKeyboardController(Node):
         self.joint_pos[4] = self.clamp(self.joint_pos[4] - self.rotate_angle, math.radians(0), math.radians(70))
         pass
 
-
     def handle_key_b(self):
         # 初始化機器手臂到預設位置的方法
         self.stdscr.addstr(f"將機器手臂初始化到預設位置...")
@@ -322,6 +322,7 @@ class CarCKeyboardController(Node):
         msg.positions = [float(pos) for pos in self.joint_pos]
         msg.velocities = [0.0, 0.0, 0.0, 0.0, 0.0]  # Replace with actual desired velocities
         self.joint_trajectory_publisher_.publish(msg)
+
 
 # ... Rest of your code, e.g. initializing rclpy and running the node
 def main(args=None):

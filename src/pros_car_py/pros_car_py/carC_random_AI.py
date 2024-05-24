@@ -23,7 +23,7 @@ class CarCRandomAI(Node):
         # Publisher
         self.publisher = self.create_publisher(
             String,
-            DeviceDataTypeEnum.car_C_control,  # topic name
+            DeviceDataTypeEnum.car_C_rear_wheel,  # topic name
             10
         )
         self.pub_timer = self.create_timer(2, self._pub_callback)
@@ -41,7 +41,7 @@ class CarCRandomAI(Node):
     def _pub_callback(self):
         # Generate a random control signal
         control_signal = {
-            "type": str(DeviceDataTypeEnum.car_C_control),
+            "type": str(DeviceDataTypeEnum.car_C_rear_wheel),
             "data": dict(CarCControl(
                 direction=random.randint(70, 110),
                 target_vel=[random.uniform(-20, 20), random.uniform(-20, 20)]

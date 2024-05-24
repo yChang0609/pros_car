@@ -10,7 +10,7 @@ users only, and must always remain proprietary to 帕亞科技 (PAIA-Tech).
 
 
 This code is a node to write control signal to specific arm.
-It will receive topic /joint_trajectory_point from ROS and
+It will receive topic /robot_arm from ROS and
 transform to servo control signal for serial device.
 
 """
@@ -23,7 +23,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 import std_msgs.msg
 from trajectory_msgs.msg import JointTrajectoryPoint
-
+from pros_car_py.car_models import *
 from serial import Serial
 
 
@@ -38,7 +38,7 @@ class ArmSerialWriter(Node):
         #  subscribe
         self._subscriber = self.create_subscription(
             JointTrajectoryPoint,
-            'joint_trajectory_point',
+            DeviceDataTypeEnum.robot_arm,
             self.listener_callback,
             10
         )

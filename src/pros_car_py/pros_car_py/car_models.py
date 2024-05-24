@@ -30,7 +30,9 @@ class DeviceDataTypeEnum(StringEnum):
     car_A_control = auto()
     car_C_state = auto()
     car_C_state_front = auto()
-    car_C_control = auto()
+    car_C_front_wheel = auto()
+    car_C_rear_wheel = auto()
+    robot_arm = auto()
 
 
 class DeviceData(pydantic.BaseModel):

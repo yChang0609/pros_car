@@ -28,7 +28,7 @@ class CarBControlSubscriber(Node):
             # TODO use more clear method to write
             # TODO divide serial data and data validation
             if control_data.get("type") == DeviceDataTypeEnum.car_B_control:
-                self.process_control_data(CarDControl, control_data.get("data", {}))
+                self.process_control_data(CarBControl, control_data.get("data", {}))
         except orjson.JSONDecodeError as e:
             self.get_logger().error("JSON decode error: {}".format(e))
         except KeyError as e:

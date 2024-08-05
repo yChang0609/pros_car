@@ -29,10 +29,12 @@ from serial import Serial
 
 class ArmSerialWriter(Node):
     def __init__(self):
-        super().__init__('arm_serial_writer')
+        super().__init__("arm_serial_writer")
 
         # Set up the serial connection
-        serial_port = self.declare_parameter('serial_port', ARM_SERIAL_PORT_DEFAULT).value
+        serial_port = self.declare_parameter(
+            "serial_port", ARM_SERIAL_PORT_DEFAULT
+        ).value
         self._serial = Serial(serial_port, 115200, timeout=0)
 
         #  subscribe
@@ -40,7 +42,7 @@ class ArmSerialWriter(Node):
             JointTrajectoryPoint,
             DeviceDataTypeEnum.robot_arm,
             self.listener_callback,
-            10
+            10,
         )
 
     def listener_callback(self, msg: JointTrajectoryPoint):
@@ -71,5 +73,5 @@ def main(args=None):
     rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -16,5 +16,17 @@ if [ -e /dev/usb_robot_arm ]; then
     device_options+=" --device=/dev/usb_robot_arm"
 fi
 
+if [ -e /dev/video0 ]; then
+    device_options+=" --device=/dev/video0"
+fi
+
+if [ -e /dev/video1 ]; then
+    device_options+=" --device=/dev/video1"
+fi
+
+if [ -e /dev/imu_usb ]; then
+    device_options+=" --device=/dev/imu_usb"
+fi
+
 # 建構完整指令
-docker run -it --rm -v "$(pwd)/src:/workspaces/src" --network scripts_my_bridge_network $device_options --env-file ./.env ghcr.io/otischung/pros_ai_image:latest /bin/bash
+docker run -it --rm -v "$(pwd)/src:/workspaces/src" --device /dev/bus/usb:/dev/bus/usb --network scripts_my_bridge_network $device_options --env-file ./.env ghcr.io/otischung/pros_ai_image:latest /bin/bash

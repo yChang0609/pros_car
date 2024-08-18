@@ -330,10 +330,10 @@ class CarCKeyboardController(Node):
         # self.pub_arm()
         self.joint_pos = [
             math.radians(90),
-            math.radians(0),
+            math.radians(30),
             math.radians(160),
-            math.radians(50),
-            math.radians(10),
+            math.radians(180),
+            math.radians(150),
         ]
 
     def pub_arm(self):

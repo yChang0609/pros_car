@@ -28,5 +28,15 @@ if [ -e /dev/imu_usb ]; then
     device_options+=" --device=/dev/imu_usb"
 fi
 
+if [ -e /dev/bus/usb ]; then
+    device_options+=" --device=/dev/bus/usb"
+fi
+
 # 建構完整指令
-docker run -it --rm -v "$(pwd)/src:/workspaces/src" --device /dev/bus/usb:/dev/bus/usb --network scripts_my_bridge_network $device_options --env-file ./.env ghcr.io/otischung/pros_ai_image:latest /bin/bash
+docker run -it --rm \
+    -v "$(pwd)/src:/workspaces/src" \
+    --network scripts_my_bridge_network \
+    $device_options \
+    --env-file ./.env \
+    ghcr.io/otischung/pros_ai_image:latest \
+    /bin/bash

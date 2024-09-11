@@ -37,6 +37,7 @@ rem Construct and run the Docker command
 docker run -it --rm ^
     -v "%cd%/src:/workspaces/src" ^
     --network scripts_my_bridge_network ^
+    -p 9090:9090 ^
     %device_options% ^
     --env-file ./.env ^
     ghcr.io/otischung/pros_ai_image:latest ^

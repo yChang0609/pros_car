@@ -28,7 +28,6 @@ setup(
             "arm_writer = pros_car_py.arm_writer:main",
             "arm_test = pros_car_py.arm_test:main",
             "lidar_trans = pros_car_py.lidar_trans:main",
-            "cv_bridge = pros_car_py.cv_bridge:main",
         ],
     },
 )

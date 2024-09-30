@@ -15,21 +15,29 @@ It will publish arm state.
 """
 
 import orjson
-
-import math
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import JointState
-
 from rclpy.duration import Duration
-
+from sensor_msgs.msg import JointState
 from serial import Serial
 from .env import ARM_SERIAL_PORT_DEFAULT
 
 
 class ArmSerialReader(Node):
+    """
+    A ROS2 node for reading serial data from an ESP32 device and publishing it as joint states.
+
+    This node establishes a serial connection with the ESP32 to receive joint angle data, converts the 
+    angles from degrees to radians, and publishes the data as `JointState` messages to a ROS topic.
+    """
     def __init__(self):
+        """
+        Initializes the ArmSerialReader node.
+
+        Sets up the serial connection, the joint state publisher, a timer for periodic data reading, and
+        logging intervals.
+        """
         super().__init__('arm_serial_reader')
 
         # Set up the serial connection
@@ -48,10 +56,16 @@ class ArmSerialReader(Node):
         self.last_log_time = current_time
 
         # Set up a timer to read data from the serial device
-        # 每 n 秒收一次資料
+        # Read data every 'n' seconds.
 
     def reader_callback(self):
+        """
+        Callback function for reading serial data and publishing joint states.
 
+        Reads data from the ESP32 via the serial connection, decodes the JSON data, converts the joint angles 
+        from degrees to radians, and publishes the joint states as a `JointState` message. Errors during 
+        reading or parsing are logged.
+        """
         # Read data from the serial device
         data = self._serial.readline()
         try:
@@ -90,6 +104,12 @@ class ArmSerialReader(Node):
 
 
 def main(args=None):
+    """
+    Main entry point for the ArmSerialReader node.
+
+    Initializes the ROS2 system, creates an instance of ArmSerialReader, and starts spinning the node
+    to keep it active.
+    """
     rclpy.init(args=args)
 
     serial_reader = ArmSerialReader()

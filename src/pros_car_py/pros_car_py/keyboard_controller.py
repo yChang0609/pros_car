@@ -1,6 +1,7 @@
 import os
 import curses
 import math
+from pros_car_py.joint_config import JOINT_UPDATES_POSITIVE, JOINT_UPDATES_NEGATIVE
 
 
 class KeyboardController:
@@ -18,59 +19,6 @@ class KeyboardController:
         # 使用環境變數 WHEEL_SPEED，若無則使用 default_vel
 
         self.vel = float(os.getenv("WHEEL_SPEED", default_vel))
-        self.rotate_angle = math.radians(float(os.getenv("ARM_ROTATE_ANGLE", 10.0)))
-        joint_updates = [
-            (
-                0,
-                math.radians(10),
-                0,
-                3600,
-            ),  # 將 Joint 0 增加 10 度，範圍在 -90 度到 90 度之間
-            (
-                1,
-                math.radians(10),
-                0,
-                3600,
-            ),  # 將 Joint 1 減少 15 度，範圍在 -45 度到 45 度之間
-            (
-                2,
-                math.radians(10),
-                0,
-                3600,
-            ),  # 將 Joint 2 增加 20 度，範圍在 0 度到 180 度之間
-            (
-                3,
-                math.radians(10),
-                0,
-                3600,
-            ),
-        ]
-        joint_updates2 = [
-            (
-                0,
-                math.radians(-10),
-                0,
-                3600,
-            ),  # 將 Joint 0 增加 10 度，範圍在 -90 度到 90 度之間
-            (
-                1,
-                math.radians(-10),
-                0,
-                3600,
-            ),  # 將 Joint 1 減少 15 度，範圍在 -45 度到 45 度之間
-            (
-                2,
-                math.radians(-10),
-                0,
-                3600,
-            ),  # 將 Joint 2 增加 20 度，範圍在 0 度到 180 度之間
-            (
-                3,
-                math.radians(-10),
-                0,
-                3600,
-            ),
-        ]
         self.key_map = {
             "w": self.handle_car_forward,
             "a": self.handle_car_left,
@@ -79,8 +27,12 @@ class KeyboardController:
             "e": self.handle_car_rotate_cw,
             "r": self.handle_car_rotate_ccw,
             "z": self.handle_car_stop,
-            "i": lambda: self.arm_controller.update_multiple_joints(joint_updates2),
-            "k": lambda: self.arm_controller.update_multiple_joints(joint_updates),
+            "i": lambda: self.arm_controller.update_multiple_joints(
+                JOINT_UPDATES_POSITIVE
+            ),
+            "k": lambda: self.arm_controller.update_multiple_joints(
+                JOINT_UPDATES_NEGATIVE
+            ),
             "b": lambda: self.arm_controller.reset_arm(),
         }
         self.last_key = None  # 儲存上一次按鍵輸入

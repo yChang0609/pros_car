@@ -1,57 +1,86 @@
-import rclpy
-import time
 import math
+import time
+import rclpy
 from rclpy.node import Node
+from rcl_interfaces.msg import ParameterDescriptor
 from trajectory_msgs.msg import JointTrajectoryPoint
-from argparse import ArgumentParser
 
 
 class ArmTestNode(Node):
-    """測試機械手臂的節點"""
+    """
+    A ROS2 node for testing the robotic arm by publishing joint angles.
 
-    def __init__(self, joint_count):
+    This node publishes joint angles to simulate moving the robotic arm
+    joints from 0 to 180 degrees.
+    
+    Attributes:
+        joint_count (int): Number of joints to control.
+        joint_trajectory_publisher_ (Publisher): Publisher to send joint angle messages.
+    """
+
+    def __init__(self, joint_count: int):
+        """
+        Initializes the ArmTestNode.
+
+        The constructor declares a parameter for the number of joints and sets
+        up the publisher to publish joint angles to the 'robot_arm' topic.
+
+        References:
+            https://docs.ros.org/en/humble/Tutorials/Beginner-Client-Libraries/Using-Parameters-In-A-Class-Python.html
+        """
         super().__init__("arm_test_node")
-        self.joint_count = joint_count  # 軀幹數量
+
+        # Declare the 'joints' parameter with a descriptor for metadata
+        joint_param_descriptor = ParameterDescriptor(
+            name="joint_count",
+            type=rclpy.Parameter.Type.INTEGER,
+            description="Number of joints to control."
+        )
+        self.declare_parameter("joint_count", 4, joint_param_descriptor)  # Default is 4 joints
+        self.joint_count = self.get_parameter("joint_count").get_parameter_value().integer_value
+
         self.joint_trajectory_publisher_ = self.create_publisher(
             JointTrajectoryPoint, "robot_arm", 10
         )
 
     def move_joints(self):
-        """讓每個軀幹從 0 度到 180 度發送訊息，並間隔 0.5 秒"""
-        for angle in range(0, 181, 10):  # 0度到180度，步進10度
+        """
+        Publishes messages to move each joint from 0 to 180 degrees, with a 0.5 second interval.
+        
+        This method sends joint angle positions for all joints to the `robot_arm` topic.
+        Each joint moves from 0 degrees to 180 degrees in steps of 10 degrees.
+        """
+        for angle in range(0, 181, 10):  # From 0 to 180 degrees in steps of 10 degrees
             msg = JointTrajectoryPoint()
             msg.positions = [
                 math.radians(angle)
-            ] * self.joint_count  # 所有關節設置為相同的角度
-            msg.velocities = [0.0] * self.joint_count  # 初始化速度為 0
+            ] * self.joint_count  # Set all joints to the same angle
+            msg.velocities = [0.0] * self.joint_count  # Initialize velocities to 0
             self.joint_trajectory_publisher_.publish(msg)
             self.get_logger().info(
                 f"Published joint angles: {angle} degrees to {self.joint_count} joints."
             )
-            time.sleep(0.5)  # 每次間隔 0.5 秒
+            time.sleep(0.5)  # Pause for 0.5 seconds between each message
 
 
 def main(args=None):
+    """
+    The main function to initialize and run the ArmTestNode.
+
+    This function initializes the ROS 2 environment, retrieves the number of joints
+    from the parameter, and starts moving the joints by calling the `move_joints` method.
+    """
     rclpy.init(args=args)
 
-    # 使用 argparse 來解析軀幹數量參數
-    parser = ArgumentParser(
-        description="Test arm controller by sending joint positions."
-    )
-    parser.add_argument(
-        "--joints", type=int, default=4, help="Number of joints to control (default: 4)"
-    )
-    args = parser.parse_args()
-
-    # 初始化節點
-    arm_test_node = ArmTestNode(joint_count=args.joints)
+    # Initialize the node
+    arm_test_node = ArmTestNode()
 
     try:
-        arm_test_node.move_joints()  # 開始動作測試
+        arm_test_node.move_joints()  # Start moving the joints
     except KeyboardInterrupt:
         pass
 
-    # 結束時關閉 rclpy
+    # Clean up when finished
     arm_test_node.destroy_node()
     rclpy.shutdown()
 

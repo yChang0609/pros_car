@@ -21,7 +21,7 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "carC_keyboard = pros_car_py.carC_keyboard:main",
+            "car_keyboard = pros_car_py.keyboard_controller:main",
             "carC_reader = pros_car_py.carC_serial_reader:main",
             "carC_writer = pros_car_py.carC_serial_writer:main",
             "arm_reader = pros_car_py.arm_reader:main",

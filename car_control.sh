@@ -17,4 +17,4 @@ if [ -e /dev/usb_robot_arm ]; then
 fi
 
 # 建構完整指令
-docker run -it --rm -v "$(pwd)/src:/workspaces/src" --network scripts_my_bridge_network $device_options --env-file ./.env ghcr.io/otischung/pros_ai_image:latest /bin/bash
+docker run -it --rm -v "$(pwd)/src:/workspaces/src" --network compose_my_bridge_network $device_options --env-file ./.env ghcr.io/otischung/pros_ai_image:latest /bin/bash

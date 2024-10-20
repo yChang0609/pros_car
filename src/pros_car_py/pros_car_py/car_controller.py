@@ -66,8 +66,8 @@ class CarController(Node):
         self._vel4 = 0
 
         # ROS Publisher, initializes by publishing both rear and front control signals
-        self.publisher_rear = self.create_publisher(String, DeviceDataTypeEnum.car_C_rear_wheel, 10)
-        self.publisher_forward = self.create_publisher(String, DeviceDataTypeEnum.car_C_front_wheel, 10)
+        
+        
         self.publish_control(publish_rear=True, publish_front=True)
 
     def update_velocity(self, vel1, vel2, vel3, vel4):
@@ -120,6 +120,42 @@ class CarController(Node):
             control_msg_front.data = orjson.dumps(control_signal_front).decode()
             self.publisher_forward.publish(control_msg_front)
             # self.get_logger().info(f"Published to front: {control_msg_front}")
+
+
+    def manual_control(self, key):
+        """
+        Controls the car based on single character inputs ('w', 'a', 's', 'd', 'z').
+
+        Args:
+            key (str): A single character representing a control command.
+                'w' - move forward
+                's' - move backward
+                'a' - turn left
+                'd' - turn right
+                'z' - stop
+
+        Example:
+            car_controller.manual_control('w')  # Moves the car forward.
+        """
+        if key == 'w':
+            self.move_forward(self.vel)
+        elif key == 's':
+            self.move_backward(self.vel)
+        elif key == 'a':
+            self.turn_left(self.vel)
+        elif key == 'd':
+            self.turn_right(self.vel)
+        elif key == 'e':
+            self.rotate_cw(self.vel)
+        elif key == 'r':
+            self.rotate_ccw(self.vel)
+        elif key == 'z':
+            self.stop()
+        else:
+            self.get_logger().info(f"Invalid key: {key}")
+    
+    def auto_control(self):
+        pass
 
     def move_forward(self, vel):
         """

@@ -1,0 +1,26 @@
+from pros_car_py.nav2_utils import get_yaw_from_quaternion
+class Nav2Processing:
+    def __init__(self, ros_communicator, data_processor):
+        self.ros_communicator = ros_communicator
+        self.data_processor = data_processor
+            
+    def get_action(self):
+        orientation_points, coordinates = self.data_processor.get_processed_received_global_plan()
+        action_key = "STOP"
+        if not orientation_points or not coordinates:
+            action_key = "STOP"
+        else:
+            z, w = orientation_points[0]
+            plan_yaw = get_yaw_from_quaternion(z, w)
+            car_position, car_orientation = self.data_processor.get_processed_amcl_pose()
+            car_yaw = get_yaw_from_quaternion(car_orientation[2], car_orientation[3])
+            diff_angle = (plan_yaw - car_yaw) % 360.0
+            if diff_angle < 10.0 or (diff_angle > 350 and diff_angle < 360):
+                action_key = "FORWARD"
+            elif diff_angle > 10.0 and diff_angle < 180.0:
+                action_key = "COUNTERCLOCKWISE_ROTATION"
+            elif diff_angle > 180.0 and diff_angle < 350.0:
+                action_key = "CLOCKWISE_ROTATION"
+            else:
+                action_key = "STOP"
+        

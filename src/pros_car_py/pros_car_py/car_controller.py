@@ -1,4 +1,3 @@
-import orjson
 from rclpy.node import Node
 from std_msgs.msg import String
 from pros_car_py.car_models import DeviceDataTypeEnum, CarCControl
@@ -68,7 +67,7 @@ class CarController(Node):
         # ROS Publisher, initializes by publishing both rear and front control signals
         
         
-        self.publish_control(publish_rear=True, publish_front=True)
+        # self.publish_control(publish_rear=True, publish_front=True)
 
     def update_velocity(self, vel1, vel2, vel3, vel4):
         """
@@ -87,39 +86,39 @@ class CarController(Node):
         self._vel2 = vel2
         self._vel3 = vel3
         self._vel4 = vel4
-        self.publish_control(publish_rear=True, publish_front=True)
+        # self.publish_control(publish_rear=True, publish_front=True)
 
 
-    def publish_control(self, publish_rear=True, publish_front=True):
-        """
-        Publishes the control signals for the car's wheels. Can selectively publish rear or front wheels.
+    # def publish_control(self, publish_rear=True, publish_front=True):
+    #     """
+    #     Publishes the control signals for the car's wheels. Can selectively publish rear or front wheels.
 
-        Args:
-            publish_rear (bool): Whether to publish the control signal for the rear wheels. Defaults to True.
-            publish_front (bool): Whether to publish the control signal for the front wheels. Defaults to True.
+    #     Args:
+    #         publish_rear (bool): Whether to publish the control signal for the rear wheels. Defaults to True.
+    #         publish_front (bool): Whether to publish the control signal for the front wheels. Defaults to True.
 
-        Example:
-            car_controller.publish_control(publish_rear=True, publish_front=False)  # Only publish rear wheels control.
-        """
-        if publish_rear:
-            control_signal_rear = {
-                "type": str(DeviceDataTypeEnum.car_C_rear_wheel),
-                "data": dict(CarCControl(target_vel=[self._vel1, self._vel2])),
-            }
-            control_msg_rear = String()
-            control_msg_rear.data = orjson.dumps(control_signal_rear).decode()
-            self.publisher_rear.publish(control_msg_rear)
-            # self.get_logger().info(f"Published to rear: {control_msg_rear}")
+    #     Example:
+    #         car_controller.publish_control(publish_rear=True, publish_front=False)  # Only publish rear wheels control.
+    #     """
+    #     if publish_rear:
+    #         control_signal_rear = {
+    #             "type": str(DeviceDataTypeEnum.car_C_rear_wheel),
+    #             "data": dict(CarCControl(target_vel=[self._vel1, self._vel2])),
+    #         }
+    #         control_msg_rear = String()
+    #         control_msg_rear.data = orjson.dumps(control_signal_rear).decode()
+    #         self.publisher_rear.publish(control_msg_rear)
+    #         # self.get_logger().info(f"Published to rear: {control_msg_rear}")
 
-        if publish_front:
-            control_signal_front = {
-                "type": str(DeviceDataTypeEnum.car_C_front_wheel),
-                "data": dict(CarCControl(target_vel=[self._vel3, self._vel4])),
-            }
-            control_msg_front = String()
-            control_msg_front.data = orjson.dumps(control_signal_front).decode()
-            self.publisher_forward.publish(control_msg_front)
-            # self.get_logger().info(f"Published to front: {control_msg_front}")
+    #     if publish_front:
+    #         control_signal_front = {
+    #             "type": str(DeviceDataTypeEnum.car_C_front_wheel),
+    #             "data": dict(CarCControl(target_vel=[self._vel3, self._vel4])),
+    #         }
+    #         control_msg_front = String()
+    #         control_msg_front.data = orjson.dumps(control_signal_front).decode()
+    #         self.publisher_forward.publish(control_msg_front)
+    #         # self.get_logger().info(f"Published to front: {control_msg_front}")
 
 
     def manual_control(self, key):

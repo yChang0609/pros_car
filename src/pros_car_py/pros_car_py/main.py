@@ -5,7 +5,9 @@ import rclpy
 from pros_car_py.joint_config import JOINT_UPDATES_POSITIVE, JOINT_UPDATES_NEGATIVE
 from pros_car_py.car_controller import CarController
 from pros_car_py.arm_controller import ArmController
-
+from pros_car_py.data_processor import DataProcessor
+from pros_car_py.nav_processing import Nav2Processing
+from pros_car_py.ros_communicator import RosCommunicator
 
 class KeyboardController:
     """鍵盤控制邏輯，專注於定義按鍵與控制行為的對應"""
@@ -66,36 +68,46 @@ class KeyboardController:
         self.last_key = c
         self.display_mode_info()  # 更新顯示
 
+def init_ros_node():
+    rclpy.init()
+    node = RosCommunicator()
+    thread = threading.Thread(target=rclpy.spin, args=(node,))
+    thread.start()
+    return node, thread
 
 def main():
-    rclpy.init()
     stdscr = curses.initscr()
-
+    ros_communicator, ros_thread = init_ros_node()
     car_controller = CarController()
     arm_controller = ArmController()
     keyboard_controller = KeyboardController(stdscr, car_controller, arm_controller, default_vel=10)
+    # ros_communicator = RosCommunicator()
+    data_processor = DataProcessor(ros_communicator)
+    nav2_processing = Nav2Processing(ros_communicator, data_processor)
+    
+    while True:
+        try:
+            while True:
+                stdscr.clear()
+                stdscr.addstr(0, 0, "Select a mode:")
+                stdscr.addstr(1, 0, "1. Car Control")
+                stdscr.addstr(2, 0, "2. Arm Control")
+                stdscr.addstr(3, 0, "3. Combined Control")
+                stdscr.addstr(4, 0, "q. Quit")
+                stdscr.refresh()
 
-    try:
-        while True:
-            stdscr.clear()
-            stdscr.addstr(0, 0, "Select a mode:")
-            stdscr.addstr(1, 0, "1. Car Control")
-            stdscr.addstr(2, 0, "2. Arm Control")
-            stdscr.addstr(3, 0, "3. Combined Control")
-            stdscr.addstr(4, 0, "q. Quit")
-            stdscr.refresh()
-
-            choice = stdscr.getch()
-            if choice == ord('q'):
-                break
-            elif choice in [ord('1'), ord('2'), ord('3')]:
-                mode = {ord('1'): "Car Control", ord('2'): "Arm Control", ord('3'): "Combined Control"}[choice]
-                keyboard_controller.mode = mode
-                keyboard_controller.run_mode()
-    finally:
-        curses.endwin()
-        rclpy.shutdown()
-
+                choice = stdscr.getch()
+                if choice == ord('q'):
+                    break
+                elif choice in [ord('1'), ord('2'), ord('3')]:
+                    mode = {ord('1'): "Car Control", ord('2'): "Arm Control", ord('3'): "Combined Control"}[choice]
+                    keyboard_controller.mode = mode
+                    keyboard_controller.run_mode()
+        finally:
+            curses.endwin()
+            rclpy.shutdown()
+    rclpy.shutdown()
+    ros_thread.join()
 
 if __name__ == "__main__":
     main()

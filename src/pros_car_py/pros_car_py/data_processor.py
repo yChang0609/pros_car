@@ -1,6 +1,6 @@
 from geometry_msgs.msg import get_latest_amcl_pose
 import math
-
+from ros_communicator import RosCommunicator
 
 # LiDAR global constants
 LIDAR_RANGE = 90
@@ -9,9 +9,13 @@ FRONT_LIDAR_INDICES = list(range(0, 16)) + list(range(-15, 0))  # front lidar in
 LEFT_LIDAR_INDICES = list(range(16, 46))  # left lidar indices
 RIGHT_LIDAR_INDICES = list(range(-45, -15))  # right lidar indices
 
-def processing_amcl_pose(amcl_pose_msg):
+    
+def get_processed_amcl_pose(amcl_pose_msg):
     position = amcl_pose_msg.pose.pose.position
     orientation = amcl_pose_msg.pose.pose.orientation
+    pose = [position.x, position.y, position.z]
+    quaternion = [orientation.x, orientation.y, orientation.z, orientation.w]
+    return pose, quaternion
 
 def get_processed_lidar(lidar_msg):
     angle_min = lidar_msg.angle_min

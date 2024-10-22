@@ -12,6 +12,7 @@ from sensor_msgs.msg import LaserScan
 class RosCommunicator(Node):
     def __init__(self):
         super().__init__("RosCommunicator")
+
         self.latest_amcl_pose = None
         self.subscriber_amcl = self.create_subscription(
             PoseWithCovarianceStamped, "/amcl_pose", self.subscriber_amcl_callback, 10
@@ -19,10 +20,12 @@ class RosCommunicator(Node):
         self.subscriber_goal = self.create_subscription(
             PoseStamped, "/goal_pose", self.subscriber_goal_callback, 1
         )
+        
         self.latest_lidar = None
         self.subscriber_lidar = self.create_subscription(
             LaserScan, "/scan", self.subscriber_lidar_callback, 1
         )
+
         self.subscriber_object_direction = self.create_subscription(
             String,
             "/object_direction",

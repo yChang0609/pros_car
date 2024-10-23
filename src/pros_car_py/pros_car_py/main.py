@@ -62,6 +62,8 @@ class KeyboardController:
         elif self.mode == "Arm Control":
             # 處理機械臂控制的按鍵
             pass
+        elif self.mode == "Auto Nav":
+            self.car_controller.auto_control("auto_nav")
         elif self.mode == "Combined Control":
             # 處理組合控制的按鍵
             pass
@@ -78,12 +80,13 @@ def init_ros_node():
 def main():
     stdscr = curses.initscr()
     ros_communicator, ros_thread = init_ros_node()
-    car_controller = CarController()
+    
     arm_controller = ArmController()
-    keyboard_controller = KeyboardController(stdscr, car_controller, arm_controller, default_vel=10)
     # ros_communicator = RosCommunicator()
     data_processor = DataProcessor(ros_communicator)
     nav2_processing = Nav2Processing(ros_communicator, data_processor)
+    car_controller = CarController(ros_communicator, nav2_processing)
+    keyboard_controller = KeyboardController(stdscr, car_controller, arm_controller, default_vel=10)
     
     while True:
         try:
@@ -92,15 +95,16 @@ def main():
                 stdscr.addstr(0, 0, "Select a mode:")
                 stdscr.addstr(1, 0, "1. Car Control")
                 stdscr.addstr(2, 0, "2. Arm Control")
-                stdscr.addstr(3, 0, "3. Combined Control")
-                stdscr.addstr(4, 0, "q. Quit")
+                stdscr.addstr(3, 0, "3. Auto Nav")
+                stdscr.addstr(4, 0, "4. Combined Control")
+                stdscr.addstr(5, 0, "q. Quit")
                 stdscr.refresh()
 
                 choice = stdscr.getch()
                 if choice == ord('q'):
                     break
-                elif choice in [ord('1'), ord('2'), ord('3')]:
-                    mode = {ord('1'): "Car Control", ord('2'): "Arm Control", ord('3'): "Combined Control"}[choice]
+                elif choice in [ord('1'), ord('2'), ord('3'), ord('4')]:
+                    mode = {ord('1'): "Car Control", ord('2'): "Arm Control", ord('3'): "Auto Nav", ord('4'): "Combined Control"}[choice]
                     keyboard_controller.mode = mode
                     keyboard_controller.run_mode()
         finally:

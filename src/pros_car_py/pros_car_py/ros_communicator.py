@@ -4,7 +4,7 @@ from geometry_msgs.msg import (
     PoseWithCovarianceStamped,
     PoseStamped,
 )
-from std_msgs.msg import String
+from std_msgs.msg import String, Header
 from nav_msgs.msg import Path
 from sensor_msgs.msg import LaserScan
 import orjson
@@ -49,6 +49,9 @@ class RosCommunicator(Node):
         self.publisher_rear = self.create_publisher(String, DeviceDataTypeEnum.car_C_rear_wheel, 10)
         self.publisher_forward = self.create_publisher(String, DeviceDataTypeEnum.car_C_front_wheel, 10)
 
+        # publish goal_pose
+        self.publisher_goal_pose = self.create_publisher(PoseStamped, "/goal_pose", 10)
+
     # amcl_pose callback and get_latest_amcl_pose
     def subscriber_amcl_callback(self, msg):
         self.latest_amcl_pose = msg
@@ -71,7 +74,6 @@ class RosCommunicator(Node):
     
     # lidar callback and get_latest_lidar
     def subscriber_lidar_callback(self, msg):
-        print("lidar : ", msg)
         self.latest_lidar = msg
 
     def get_latest_lidar(self):
@@ -115,3 +117,13 @@ class RosCommunicator(Node):
             self.publisher_forward.publish(control_msg_front)
             # self.get_logger().info(f"Published to front: {control_msg_front}")
     
+    def publish_goal_pose(self, goal_pose):
+        goal_pose = PoseStamped()
+        goal_pose.header = Header()
+        goal_pose.header.stamp = self.get_clock().now().to_msg()
+        goal_pose.header.frame_id = "map"
+        goal_pose.pose.position.x = goal_pose[0]
+        goal_pose.pose.position.y = goal_pose[1]
+        goal_pose.pose.position.z = 0.0
+        goal_pose.pose.orientation.w = 1.0
+        self.publisher_goal_pose.publish(goal_pose)

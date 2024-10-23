@@ -3,7 +3,7 @@ from std_msgs.msg import String
 from pros_car_py.car_models import DeviceDataTypeEnum, CarCControl
 
 
-class CarController(Node):
+class CarController():
     """
     A class to control the car.
 
@@ -39,7 +39,7 @@ class CarController(Node):
             Stops the car by setting all wheels' velocities to zero.
     """
 
-    def __init__(self, vel: float = 10):
+    def __init__(self, ros_communicator, nav_processing):
         """
         Initializes the CarController node with default velocity and sets initial velocities for all wheels.
 
@@ -57,19 +57,21 @@ class CarController(Node):
             car_controller = CarController(vel=20)
             car_controller.move_forward(20)  # Move the car forward with a velocity of 20 rad/s.
         """
-        super().__init__("car_controller")
+        vel = 0
         self.vel = vel
         self._vel1 = 0  # rad/s
         self._vel2 = 0
         self._vel3 = 0
         self._vel4 = 0
+        self.ros_communicator = ros_communicator
+        self.nav_processing = nav_processing
 
         # ROS Publisher, initializes by publishing both rear and front control signals
         
         
         # self.publish_control(publish_rear=True, publish_front=True)
 
-    def update_velocity(self, vel1, vel2, vel3, vel4):
+    def update_action(self, action_key):
         """
         Updates the velocity for each of the car's wheels.
 
@@ -82,10 +84,7 @@ class CarController(Node):
         Example:
             car_controller.update_velocity(10, 10, 10, 10)  # Set all wheels' velocity to 10 rad/s.
         """
-        self._vel1 = vel1
-        self._vel2 = vel2
-        self._vel3 = vel3
-        self._vel4 = vel4
+        self.ros_communicator.publish_car_control(action_key)
         # self.publish_control(publish_rear=True, publish_front=True)
 
 
@@ -137,102 +136,26 @@ class CarController(Node):
             car_controller.manual_control('w')  # Moves the car forward.
         """
         if key == 'w':
-            self.move_forward(self.vel)
+            self.update_action("FORWARD")
         elif key == 's':
-            self.move_backward(self.vel)
+            self.update_action("BACKWARD")
         elif key == 'a':
-            self.turn_left(self.vel)
+            self.update_action("LEFT_FRONT")
         elif key == 'd':
-            self.turn_right(self.vel)
+            self.update_action("RIGHT_FRONT")
         elif key == 'e':
-            self.rotate_cw(self.vel)
+            self.update_action("COUNTERCLOCKWISE_ROTATION")
         elif key == 'r':
-            self.rotate_ccw(self.vel)
+            self.update_action("CLOCKWISE_ROTATION")
         elif key == 'z':
-            self.stop()
+            self.update_action("STOP")
         else:
             self.get_logger().info(f"Invalid key: {key}")
     
-    def auto_control(self):
+    def auto_control(self, mode, target = None):
+        if mode == "auto_nav":
+            action_key = self.nav_processing.get_action()
+            self.ros_communicator.publish_car_control(action_key, publish_rear=True, publish_front=True)
+        elif mode == "manual_nav":
+            pass
         pass
-
-    def move_forward(self, vel):
-        """
-        Moves the car forward by updating all wheels to the same velocity.
-
-        Args:
-            vel (float): The velocity to set for all wheels (rad/s).
-
-        Example:
-            car_controller.move_forward(20)  # Move the car forward at 20 rad/s.
-        """
-        self.update_velocity(vel, vel, vel, vel)
-
-    def move_backward(self, vel):
-        """
-        Moves the car backward by updating all wheels to the negative of the given velocity.
-
-        Args:
-            vel (float): The velocity to set for all wheels (rad/s), in negative for backward movement.
-
-        Example:
-            car_controller.move_backward(15)  # Move the car backward at 15 rad/s.
-        """
-        self.update_velocity(-vel, -vel, -vel, -vel)
-
-    def turn_left(self, vel):
-        """
-        Turns the car left by reducing the velocity of the left wheels.
-
-        Args:
-            vel (float): The base velocity for the wheels, with the left wheels moving slower.
-
-        Example:
-            car_controller.turn_left(10)  # Turn the car left with a base velocity of 10 rad/s.
-        """
-        self.update_velocity(vel / 5, vel, vel / 5, vel)
-
-    def turn_right(self, vel):
-        """
-        Turns the car right by reducing the velocity of the right wheels.
-
-        Args:
-            vel (float): The base velocity for the wheels, with the right wheels moving slower.
-
-        Example:
-            car_controller.turn_right(10)  # Turn the car right with a base velocity of 10 rad/s.
-        """
-        self.update_velocity(vel, vel / 5, vel, vel / 5)
-
-    def rotate_cw(self, vel):
-        """
-        Rotates the car clockwise by setting opposite velocities for left and right wheels.
-
-        Args:
-            vel (float): The velocity for rotating the car, with left wheels moving backward and right wheels moving forward.
-
-        Example:
-            car_controller.rotate_cw(12)  # Rotate the car clockwise at a velocity of 12 rad/s.
-        """
-        self.update_velocity(-vel, vel, -vel, vel)
-
-    def rotate_ccw(self, vel):
-        """
-        Rotates the car counterclockwise by setting opposite velocities for left and right wheels.
-
-        Args:
-            vel (float): The velocity for rotating the car, with left wheels moving forward and right wheels moving backward.
-
-        Example:
-            car_controller.rotate_ccw(12)  # Rotate the car counterclockwise at a velocity of 12 rad/s.
-        """
-        self.update_velocity(vel, -vel, vel, -vel)
-
-    def stop(self):
-        """
-        Stops the car by setting the velocity of all wheels to zero.
-
-        Example:
-            car_controller.stop()  # Stop the car by setting all wheels' velocity to 0.
-        """
-        self.update_velocity(0, 0, 0, 0)

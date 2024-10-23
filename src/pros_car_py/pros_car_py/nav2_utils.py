@@ -1,4 +1,3 @@
-from ros_receive_and_data_processing.config import BODY_WIDTH, WHEEL_DIAMETER, FACTOR
 from math import pi
 from typing import Tuple
 import numpy as np
@@ -19,34 +18,7 @@ Example :
 """
 
 
-def calculate_wheel_speeds(cmd_vel_nav) -> Tuple[float, float]:
-    linear_velocity = cmd_vel_nav.linear.x
-    angular_velocity = cmd_vel_nav.angular.z
-    L = BODY_WIDTH
-    v_left = linear_velocity - (L / 2) * angular_velocity
-    v_right = linear_velocity + (L / 2) * angular_velocity
-    rpm_left, rpm_right = speed_to_rpm(v_left), speed_to_rpm(v_right)
-    pid_left, pid_right = rpm_to_pid(rpm_left), rpm_to_pid(rpm_right)
-    return pid_left, pid_right
 
-
-"""
-根據WHEEL_DIAMETER轉換成RPM
-"""
-
-
-def speed_to_rpm(speed) -> float:
-    wheel_circumference = pi * WHEEL_DIAMETER
-    return (speed / wheel_circumference) * 60
-
-
-"""
-rpm轉換成PID數值, 可於esp32程式碼做測量, 找尋rpm與PID數值之間的關係
-"""
-
-
-def rpm_to_pid(rpm) -> float:
-    return rpm / FACTOR
 
 def get_yaw_from_quaternion(z, w):
     """四位數的z、w取得偏行角"""

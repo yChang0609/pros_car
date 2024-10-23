@@ -13,7 +13,8 @@ class Nav2Processing:
             z, w = orientation_points[0]
             plan_yaw = get_yaw_from_quaternion(z, w)
             car_position, car_orientation = self.data_processor.get_processed_amcl_pose()
-            car_yaw = get_yaw_from_quaternion(car_orientation[2], car_orientation[3])
+            car_orientation_z, car_orientation_w = car_orientation[2], car_orientation[3]
+            car_yaw = get_yaw_from_quaternion(car_orientation_z, car_orientation_w)
             diff_angle = (plan_yaw - car_yaw) % 360.0
             if diff_angle < 10.0 or (diff_angle > 350 and diff_angle < 360):
                 action_key = "FORWARD"
@@ -23,4 +24,5 @@ class Nav2Processing:
                 action_key = "CLOCKWISE_ROTATION"
             else:
                 action_key = "STOP"
+        return action_key
         

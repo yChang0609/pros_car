@@ -2,6 +2,7 @@ import os
 import curses
 import threading
 import rclpy
+import time
 from pros_car_py.joint_config import JOINT_UPDATES_POSITIVE, JOINT_UPDATES_NEGATIVE
 from pros_car_py.car_controller import CarController
 from pros_car_py.arm_controller import ArmController
@@ -10,6 +11,7 @@ from pros_car_py.nav_processing import Nav2Processing
 from pros_car_py.ros_communicator import RosCommunicator
 import io
 import sys
+
 class KeyboardController:
     """鍵盤控制邏輯，專注於定義按鍵與控制行為的對應"""
 
@@ -27,20 +29,31 @@ class KeyboardController:
 
         self.mode = None
         self.output_buffer = io.StringIO()
+        self.auto_nav_thread = None
+        self.auto_nav_running = False
 
     def run_mode(self):
         """在特定模式下運行鍵盤控制邏輯"""
         self.stdscr.clear()
-        self.stdscr.nodelay(False)
+        self.stdscr.nodelay(True)  # 設置為非阻塞模式
+        if self.mode == "Auto Nav":
+            self.start_auto_nav()
+        
         while True:
             if self.mode in ["Car Control", "Arm Control"]:
                 self.display_mode_info()
             else:
                 self.display_other_mode_info()
+            
             c = self.stdscr.getch()
             if c == ord("q"):
+                if self.auto_nav_thread:
+                    self.stop_auto_nav()
                 break
-            self.handle_key_input(chr(c))
+            elif c != -1:
+                self.handle_key_input(chr(c))
+            
+            time.sleep(0.1)  # 短暫休眠以減少 CPU 使用率
 
     def display_mode_info(self):
         """顯示當前模式的信息和控制說明"""
@@ -84,8 +97,8 @@ class KeyboardController:
                 # 處理機械臂控制的按鍵
                 pass
             elif self.mode == "Auto Nav":
-                while rclpy.ok():
-                    self.car_controller.auto_control("auto_nav")
+                # Auto Nav 模式下的按鍵處理（如果需要）
+                pass
             elif self.mode == "Combined Control":
                 # 處理組合控制的按鍵
                 pass
@@ -96,6 +109,29 @@ class KeyboardController:
             self.display_mode_info()
         else:
             self.display_other_mode_info()
+
+    def start_auto_nav(self):
+        if not self.auto_nav_thread:
+            self.auto_nav_running = True
+            self.auto_nav_thread = threading.Thread(target=self.run_auto_nav)
+            self.auto_nav_thread.start()
+
+    def stop_auto_nav(self):
+        if self.auto_nav_thread:
+            self.auto_nav_running = False
+            self.auto_nav_thread.join()
+            self.auto_nav_thread = None
+
+    def run_auto_nav(self):
+        while self.auto_nav_running and rclpy.ok():
+            old_stdout = sys.stdout
+            sys.stdout = self.output_buffer
+            try:
+                self.car_controller.auto_control("auto_nav")
+            finally:
+                sys.stdout = old_stdout
+            self.display_other_mode_info()
+            time.sleep(0.1)  # 控制更新頻率
 
 def init_ros_node():
     rclpy.init()

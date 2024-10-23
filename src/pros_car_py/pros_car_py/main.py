@@ -8,7 +8,8 @@ from pros_car_py.arm_controller import ArmController
 from pros_car_py.data_processor import DataProcessor
 from pros_car_py.nav_processing import Nav2Processing
 from pros_car_py.ros_communicator import RosCommunicator
-
+import io
+import sys
 class KeyboardController:
     """鍵盤控制邏輯，專注於定義按鍵與控制行為的對應"""
 
@@ -25,13 +26,17 @@ class KeyboardController:
         self.stdscr.keypad(False)
 
         self.mode = None
+        self.output_buffer = io.StringIO()
 
     def run_mode(self):
         """在特定模式下運行鍵盤控制邏輯"""
         self.stdscr.clear()
         self.stdscr.nodelay(False)
         while True:
-            self.display_mode_info()
+            if self.mode in ["Car Control", "Arm Control"]:
+                self.display_mode_info()
+            else:
+                self.display_other_mode_info()
             c = self.stdscr.getch()
             if c == ord("q"):
                 break
@@ -54,21 +59,43 @@ class KeyboardController:
             self.stdscr.addstr(6, 0, f"Last key pressed: {self.last_key}")
         self.stdscr.refresh()
 
+    def display_other_mode_info(self):
+        """顯示其他模式的內部打印信息"""
+        self.stdscr.clear()
+        self.stdscr.addstr(0, 0, f"Current mode: {self.mode}")
+        self.stdscr.addstr(1, 0, "Internal print output:")
+        y = 2
+        for line in self.output_buffer.getvalue().split('\n'):
+            self.stdscr.addstr(y, 0, line[:curses.COLS-1])  # 確保不超過屏幕寬度
+            y += 1
+            if y >= curses.LINES - 1:  # 確保不超過屏幕高度
+                break
+        self.stdscr.addstr(curses.LINES-1, 0, "Press 'q' to return to main menu")
+        self.stdscr.refresh()
+
     def handle_key_input(self, c):
         """處理鍵盤輸入"""
-        # 根據不同的模式處理不同的按鍵
-        if self.mode == "Car Control":
-            self.car_controller.manual_control(c)
-        elif self.mode == "Arm Control":
-            # 處理機械臂控制的按鍵
-            pass
-        elif self.mode == "Auto Nav":
-            self.car_controller.auto_control("auto_nav")
-        elif self.mode == "Combined Control":
-            # 處理組合控制的按鍵
-            pass
-        self.last_key = c
-        self.display_mode_info()  # 更新顯示
+        old_stdout = sys.stdout
+        sys.stdout = self.output_buffer
+        try:
+            if self.mode == "Car Control":
+                self.car_controller.manual_control(c)
+            elif self.mode == "Arm Control":
+                # 處理機械臂控制的按鍵
+                pass
+            elif self.mode == "Auto Nav":
+                while rclpy.ok():
+                    self.car_controller.auto_control("auto_nav")
+            elif self.mode == "Combined Control":
+                # 處理組合控制的按鍵
+                pass
+            self.last_key = c
+        finally:
+            sys.stdout = old_stdout
+        if self.mode in ["Car Control", "Arm Control"]:
+            self.display_mode_info()
+        else:
+            self.display_other_mode_info()
 
 def init_ros_node():
     rclpy.init()
@@ -106,6 +133,7 @@ def main():
                 elif choice in [ord('1'), ord('2'), ord('3'), ord('4')]:
                     mode = {ord('1'): "Car Control", ord('2'): "Arm Control", ord('3'): "Auto Nav", ord('4'): "Combined Control"}[choice]
                     keyboard_controller.mode = mode
+                    keyboard_controller.output_buffer = io.StringIO()  # 清空輸出緩衝區
                     keyboard_controller.run_mode()
         finally:
             curses.endwin()

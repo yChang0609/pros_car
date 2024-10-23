@@ -155,6 +155,7 @@ class CarController():
     def auto_control(self, mode, target = None):
         if mode == "auto_nav":
             action_key = self.nav_processing.get_action()
+            print("action_key", action_key)
             self.ros_communicator.publish_car_control(action_key, publish_rear=True, publish_front=True)
         elif mode == "manual_nav":
             pass

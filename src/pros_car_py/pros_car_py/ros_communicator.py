@@ -88,6 +88,7 @@ class RosCommunicator(Node):
     def get_latest_received_global_plan(self):
         if self.latest_received_global_plan is None:
             self.get_logger().warn("No received global plan data received yet.")
+            return None
         return self.latest_received_global_plan
     
     # publish car_C_rear_wheel and car_C_front_wheel

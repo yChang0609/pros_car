@@ -42,6 +42,8 @@ class DataProcessor:
 
     def get_processed_received_global_plan(self):
         received_global_plan_msg = self.ros_communicator.get_latest_received_global_plan()
+        if received_global_plan_msg is None:
+            return None, None
         path_length = len(received_global_plan_msg.poses)
         orientation_points = []
         coordinates = []

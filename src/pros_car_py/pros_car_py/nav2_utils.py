@@ -74,3 +74,13 @@ def calculate_angle_to_target(vehicle_pos, target_pos, vehicle_orientation):
     angle_difference = atan2(math.sin(angle_difference), math.cos(angle_difference))
 
     return degrees(angle_difference)
+
+def round_to_decimal_places(data_list, decimal_places=3):
+    return [round(num, decimal_places) for num in data_list]
+
+def cal_distance(car_pos, target_pos):
+    car_target_distance = (car_pos[0] - target_pos[0]) ** 2 + (
+        car_pos[1] - target_pos[1]
+    ) ** 2
+    car_target_distance = round_to_decimal_places([math.sqrt(car_target_distance)])[0]
+    return car_target_distance

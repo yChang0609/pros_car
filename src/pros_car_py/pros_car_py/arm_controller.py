@@ -42,14 +42,14 @@ class ArmController():
             self.adjust_joint_angle(joint_id = 0, delta_angle = 10, min_angle=0, max_angle=180)
         elif key == 'l':
             self.adjust_joint_angle(joint_id = 0, delta_angle = -10, min_angle=0, max_angle=180)
-        elif key == 'i':
-            self.adjust_joint_angle(joint_id = 1, delta_angle = 10, min_angle=0, max_angle=120)
         elif key == 'k':
+            self.adjust_joint_angle(joint_id = 1, delta_angle = 10, min_angle=0, max_angle=120)
+        elif key == 'i':
             self.adjust_joint_angle(joint_id = 1, delta_angle = -10, min_angle=0, max_angle=120)
         elif key == 'y':
-            self.adjust_joint_angle(joint_id = 2, delta_angle = 10, min_angle=0, max_angle=150)
-        elif key == 'h':
             self.adjust_joint_angle(joint_id = 2, delta_angle = -10, min_angle=0, max_angle=150)
+        elif key == 'h':
+            self.adjust_joint_angle(joint_id = 2, delta_angle = 10, min_angle=0, max_angle=150)
         elif key == 'm':
             self.adjust_joint_angle(joint_id = 3, delta_angle = 10, min_angle=50, max_angle=180)
         elif key == 'n':

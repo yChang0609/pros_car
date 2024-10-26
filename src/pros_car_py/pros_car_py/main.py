@@ -145,7 +145,7 @@ def main():
     data_processor = DataProcessor(ros_communicator)
     nav2_processing = Nav2Processing(ros_communicator, data_processor)
     car_controller = CarController(ros_communicator, nav2_processing)
-    arm_controller = ArmController(ros_communicator, nav2_processing, num_joints = 4)
+    arm_controller = ArmController(ros_communicator, nav2_processing, num_joints = 5)
     keyboard_controller = KeyboardController(stdscr, car_controller, arm_controller, default_vel=10)
     
     while True:

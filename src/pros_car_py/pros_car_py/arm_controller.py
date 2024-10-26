@@ -115,32 +115,36 @@ class ArmController():
             joint_configs (list[dict]): A list of joint configurations, where each configuration is a dictionary containing:
                 - joint_id: The index of the joint
                 - angle: Target angle in degrees
-                - limits: Tuple of (min_angle, max_angle) in degrees
+                - limits: (Optional) Tuple of (min_angle, max_angle) in degrees. 
+                         Defaults to (-90, 90) if not specified.
 
         Example:
             joint_configs = [
                 {
                     "joint_id": 0,
                     "angle": 30,
-                    "limits": (-90, 90)    # base joint
+                    # 使用默認限制 (-90, 90)
                 },
                 {
                     "joint_id": 1,
                     "angle": -20,
-                    "limits": (-45, 45)    # shoulder joint
+                    "limits": (-45, 45)    # 自定義限制
                 },
                 {
                     "joint_id": 2,
                     "angle": 90,
-                    "limits": (0, 180)     # elbow joint
+                    "limits": (0, 180)     # 自定義限制
                 }
             ]
             >>> self.set_multiple_joint_positions(joint_configs)
         """
+        DEFAULT_LIMITS = (-90, 90)  # 預設角度限制
+        
         for config in joint_configs:
             joint_id = config["joint_id"]
             target_angle = config["angle"]
-            min_angle, max_angle = config["limits"]
+            # 如果沒有設定 limits，使用預設值
+            min_angle, max_angle = config.get("limits", DEFAULT_LIMITS)
             
             self.set_joint_position(
                 joint_index=joint_id,
@@ -164,7 +168,33 @@ class ArmController():
             >>> self.reset_arm()
             >>> self.publish_arm_position()
         """
-        self.set_all_joint_positions(all_angle_degrees)
+        joint_configs = [
+            {
+                "joint_id": 0,
+                "angle": 90,
+            },
+            {
+                "joint_id": 1,
+                "angle": 30,
+                "limits": (-45, 45)
+            },
+            {
+                "joint_id": 2,
+                "angle": 160,
+                "limits": (0, 180)
+            },
+            {
+                "joint_id": 3,
+                "angle": 180,
+                "limits": (50, 180)
+            },
+            {
+                "joint_id": 4,
+                "angle": 10,
+                "limits": (10, 70)
+            }
+        ]
+        self.set_multiple_joint_positions(joint_configs)
 
     def adjust_joint_angle(self, joint_id, delta_angle, min_angle=-90, max_angle=90):
         """

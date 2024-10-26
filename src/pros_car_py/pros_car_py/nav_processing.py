@@ -1,10 +1,13 @@
 from pros_car_py.nav2_utils import get_yaw_from_quaternion, cal_distance
+
 class Nav2Processing:
     def __init__(self, ros_communicator, data_processor):
         self.ros_communicator = ros_communicator
         self.data_processor = data_processor
-            
-    def get_action_from_nav2_plan(self):
+    
+    def get_action_from_nav2_plan(self, goal_coordinates = None):
+        if goal_coordinates is not None:
+            self.ros_communicator.publish_goal_pose(goal_coordinates)
         orientation_points, coordinates = self.data_processor.get_processed_received_global_plan()
         action_key = "STOP"
         if not orientation_points or not coordinates:
@@ -30,3 +33,4 @@ class Nav2Processing:
                 else:
                     action_key = "STOP"
         return action_key        
+    

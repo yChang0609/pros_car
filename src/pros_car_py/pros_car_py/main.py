@@ -94,8 +94,7 @@ class KeyboardController:
             if self.mode == "Car Control":
                 self.car_controller.manual_control(c)
             elif self.mode == "Arm Control":
-                # 處理機械臂控制的按鍵
-                pass
+                self.arm_controller.manual_control(c)
             elif self.mode == "Auto Nav":
                 # Auto Nav 模式下的按鍵處理（如果需要）
                 pass
@@ -143,12 +142,10 @@ def init_ros_node():
 def main():
     stdscr = curses.initscr()
     ros_communicator, ros_thread = init_ros_node()
-    
-    arm_controller = ArmController()
-    # ros_communicator = RosCommunicator()
     data_processor = DataProcessor(ros_communicator)
     nav2_processing = Nav2Processing(ros_communicator, data_processor)
     car_controller = CarController(ros_communicator, nav2_processing)
+    arm_controller = ArmController(ros_communicator, nav2_processing, num_joints = 4)
     keyboard_controller = KeyboardController(stdscr, car_controller, arm_controller, default_vel=10)
     
     while True:

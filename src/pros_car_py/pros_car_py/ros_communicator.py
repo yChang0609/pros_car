@@ -117,6 +117,7 @@ class RosCommunicator(Node):
             self.publisher_forward.publish(control_msg_front)
             # self.get_logger().info(f"Published to front: {control_msg_front}")
     
+    # publish goal_pose
     def publish_goal_pose(self, goal_pose):
         goal_pose = PoseStamped()
         goal_pose.header = Header()

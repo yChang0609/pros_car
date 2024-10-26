@@ -7,12 +7,13 @@ from geometry_msgs.msg import (
 from std_msgs.msg import String, Header
 from nav_msgs.msg import Path
 from sensor_msgs.msg import LaserScan
+from trajectory_msgs.msg import JointTrajectoryPoint
 import orjson
 from pros_car_py.ros_communicator_config import ACTION_MAPPINGS
+
 class RosCommunicator(Node):
     def __init__(self):
         super().__init__("RosCommunicator")
-        print("RosCommunicator init")
 
         # subscribeamcl_pose
         self.latest_amcl_pose = None
@@ -38,19 +39,17 @@ class RosCommunicator(Node):
             Path, "/received_global_plan", self.received_global_plan_callback, 1
         )
 
-        # self.subscriber_object_direction = self.create_subscription(
-        #     String,
-        #     "/object_direction",
-        #     self.subscriber_object_direction_callback,
-        #     10,
-        # )
-
         # publish car_C_rear_wheel and car_C_front_wheel
         self.publisher_rear = self.create_publisher(String, DeviceDataTypeEnum.car_C_rear_wheel, 10)
         self.publisher_forward = self.create_publisher(String, DeviceDataTypeEnum.car_C_front_wheel, 10)
 
         # publish goal_pose
         self.publisher_goal_pose = self.create_publisher(PoseStamped, "/goal_pose", 10)
+
+        # publish robot arm angle
+        self.publisher_joint_trajectory = self.create_publisher(
+            JointTrajectoryPoint, DeviceDataTypeEnum.robot_arm, 10
+        )
 
     # amcl_pose callback and get_latest_amcl_pose
     def subscriber_amcl_callback(self, msg):
@@ -128,3 +127,10 @@ class RosCommunicator(Node):
         goal_pose.pose.position.z = 0.0
         goal_pose.pose.orientation.w = 1.0
         self.publisher_goal_pose.publish(goal_pose)
+    
+    # publish robot arm angle
+    def publish_robot_arm_angle(self, angle):
+        joint_trajectory_point = JointTrajectoryPoint()
+        joint_trajectory_point.positions = angle
+        joint_trajectory_point.velocities = [0.0] * len(angle)
+        self.publisher_joint_trajectory.publish(joint_trajectory_point)

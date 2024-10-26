@@ -1,10 +1,9 @@
 import math
 from rclpy.node import Node
-from trajectory_msgs.msg import JointTrajectoryPoint
 from pros_car_py.car_models import DeviceDataTypeEnum
 
 
-class ArmController(Node):
+class ArmController():
     """
     A class to control a robotic arm.
 
@@ -29,26 +28,41 @@ class ArmController(Node):
             Resets all joints of the robotic arm to their default positions.
     """
 
-    def __init__(self):
-        """
-        Initializes the ArmController node and sets default joint positions.
-
-        The initial positions can also be set via environment variables, otherwise, the default values are used.
-        """
-        super().__init__("arm_controller")
-
-        self._init_joint_pos = [
-            math.radians(float(0)),  # Initial angle for Joint 0
-            math.radians(float(0)),  # Initial angle for Joint 1
-            math.radians(float(0)),  # Initial angle for Joint 2
-            math.radians(float(0)),  # Initial angle for Joint 3
-        ]
-        self.joint_pos = self._init_joint_pos
-
-        self.joint_trajectory_publisher_ = self.create_publisher(
-            JointTrajectoryPoint, DeviceDataTypeEnum.robot_arm, 10
-        )
-
+    def __init__(self, ros_communicator, nav_processing, num_joints = 4):
+        self.ros_communicator = ros_communicator
+        self.nav_processing = nav_processing
+        self.num_joints = num_joints
+        self.joint_pos = []
+        self.set_all_joint_positions(0.0)
+    
+    def manual_control(self, key):
+        if key == 'b': # Reset arm
+            self.reset_arm(all_angle_degrees = 90.0)
+        elif key == 'j':
+            self.adjust_joint_angle(joint_id = 0, delta_angle = 10, min_angle=0, max_angle=180)
+        elif key == 'l':
+            self.adjust_joint_angle(joint_id = 0, delta_angle = -10, min_angle=0, max_angle=180)
+        elif key == 'i':
+            self.adjust_joint_angle(joint_id = 1, delta_angle = 10, min_angle=0, max_angle=120)
+        elif key == 'k':
+            self.adjust_joint_angle(joint_id = 1, delta_angle = -10, min_angle=0, max_angle=120)
+        elif key == 'y':
+            self.adjust_joint_angle(joint_id = 2, delta_angle = 10, min_angle=0, max_angle=150)
+        elif key == 'h':
+            self.adjust_joint_angle(joint_id = 2, delta_angle = -10, min_angle=0, max_angle=150)
+        elif key == 'm':
+            self.adjust_joint_angle(joint_id = 3, delta_angle = 10, min_angle=50, max_angle=180)
+        elif key == 'n':
+            self.adjust_joint_angle(joint_id = 3, delta_angle = -10, min_angle=50, max_angle=180)
+        elif key == 'u':
+            self.adjust_joint_angle(joint_id = 4, delta_angle = 10, min_angle=10, max_angle=70)
+        elif key == 'o':
+            self.adjust_joint_angle(joint_id = 4, delta_angle = -10, min_angle=10, max_angle=70)
+        self.update_action(self.joint_pos)
+        
+    def update_action(self, joint_pos):
+        self.ros_communicator.publish_robot_arm_angle(joint_pos)
+        
     def clamp(self, value, min_value, max_value):
         """
         Clamps a value within a specified range.
@@ -93,43 +107,53 @@ class ArmController(Node):
             math.radians(upper_limit),
         )
 
-    def set_multiple_joint_positions(self, joint_positions):
+    def set_multiple_joint_positions(self, joint_configs):
         """
         Sets multiple joints to specific target angles.
 
         Args:
-            joint_positions (list[tuple]): A list of tuples, each containing (joint_index, target_angle, lower_limit, upper_limit).
+            joint_configs (list[dict]): A list of joint configurations, where each configuration is a dictionary containing:
+                - joint_id: The index of the joint
+                - angle: Target angle in degrees
+                - limits: Tuple of (min_angle, max_angle) in degrees
 
         Example:
-            Set multiple joints to specific target positions:
-            joint_positions = [
-                (0, 30, -90, 90),  # Set Joint 0 to 30 degrees
-                (1, -20, -45, 45), # Set Joint 1 to -20 degrees
-                (2, 90, 0, 180)    # Set Joint 2 to 90 degrees
+            joint_configs = [
+                {
+                    "joint_id": 0,
+                    "angle": 30,
+                    "limits": (-90, 90)    # base joint
+                },
+                {
+                    "joint_id": 1,
+                    "angle": -20,
+                    "limits": (-45, 45)    # shoulder joint
+                },
+                {
+                    "joint_id": 2,
+                    "angle": 90,
+                    "limits": (0, 180)     # elbow joint
+                }
             ]
-            >>> self.set_multiple_joint_positions(joint_positions)
-
-        After setting, use `publish_arm_position()` to publish the current joint positions.
+            >>> self.set_multiple_joint_positions(joint_configs)
         """
-        for joint_index, target_angle, lower_limit, upper_limit in joint_positions:
-            self.set_joint_position(joint_index, target_angle, lower_limit, upper_limit)
+        for config in joint_configs:
+            joint_id = config["joint_id"]
+            target_angle = config["angle"]
+            min_angle, max_angle = config["limits"]
+            
+            self.set_joint_position(
+                joint_index=joint_id,
+                target_angle=target_angle,
+                lower_limit=min_angle,
+                upper_limit=max_angle
+            )
 
-    def publish_arm_position(self):
-        """
-        Publishes the current joint angles of the robotic arm.
-
-        This method publishes the current positions of all joints, and is useful after updating the joint positions
-        to notify other nodes of the current robotic arm's pose.
-
-        Example:
-            >>> self.publish_arm_position()
-        """
-        msg = JointTrajectoryPoint()
-        msg.positions = [float(pos) for pos in self.joint_pos]
-        msg.velocities = [0.0] * len(self.joint_pos)
-        self.joint_trajectory_publisher_.publish(msg)
-
-    def reset_arm(self):
+    def set_all_joint_positions(self, angle_degrees):
+        angle_radians = math.radians(angle_degrees)
+        self.joint_pos = [angle_radians] * self.num_joints
+        
+    def reset_arm(self, all_angle_degrees = 90.0):
         """
         Resets the robotic arm to the default position (all angles set to 0).
 
@@ -140,4 +164,41 @@ class ArmController(Node):
             >>> self.reset_arm()
             >>> self.publish_arm_position()
         """
-        self.joint_pos = self._init_joint_pos
+        self.set_all_joint_positions(all_angle_degrees)
+
+    def adjust_joint_angle(self, joint_id, delta_angle, min_angle=-90, max_angle=90):
+        """
+        Adjusts a joint angle by adding or subtracting from its current position.
+
+        Args:
+            joint_id (int): The index of the joint to adjust (0-based index)
+            delta_angle (float): The angle to add (positive) or subtract (negative) in degrees
+            min_angle (float): Minimum allowed angle in degrees (default: -90)
+            max_angle (float): Maximum allowed angle in degrees (default: 90)
+
+        Example:
+            # Increase joint 0's angle by 10 degrees with default limits (-90 to 90)
+            >>> self.adjust_joint_angle(0, 10)
+            
+            # Decrease joint 1's angle by 5 degrees with custom limits
+            >>> self.adjust_joint_angle(1, -5, min_angle=-45, max_angle=45)
+            
+            # Adjust joint 2 with asymmetric limits
+            >>> self.adjust_joint_angle(2, 10, min_angle=0, max_angle=180)
+        """
+        if joint_id >= self.num_joints:
+            return
+        
+        # 獲取當前角度（轉換為度數）
+        current_angle = math.degrees(self.joint_pos[joint_id])
+        
+        # 計算新角度
+        new_angle = current_angle + delta_angle
+        
+        # 更新角度
+        self.set_joint_position(
+            joint_index=joint_id,
+            target_angle=new_angle,
+            lower_limit=min_angle,
+            upper_limit=max_angle
+        )

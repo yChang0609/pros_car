@@ -11,16 +11,16 @@ from pros_car_py.nav_processing import Nav2Processing
 from pros_car_py.ros_communicator import RosCommunicator
 import io
 import sys
-
+from pros_car_py.custom_control import CustomControl
 class KeyboardController:
     """鍵盤控制邏輯，專注於定義按鍵與控制行為的對應"""
 
-    def __init__(self, stdscr, car_controller, arm_controller, default_vel=10):
+    def __init__(self, stdscr, car_controller, arm_controller, custom_control, default_vel=10):
         self.stdscr = stdscr
         self.last_key = None
         self.car_controller = car_controller
         self.arm_controller = arm_controller
-
+        self.custom_control = custom_control
         self.vel = float(os.getenv("WHEEL_SPEED", default_vel))
 
         curses.noecho()
@@ -67,6 +67,8 @@ class KeyboardController:
             self.stdscr.addstr(2, 0, "Use number keys to control arm joints")
         elif self.mode == "Combined Control":
             self.stdscr.addstr(2, 0, "Use both car and arm controls")
+        elif self.mode == "Custom Control":
+            self.stdscr.addstr(2, 0, "Use custom control keys")
         self.stdscr.addstr(4, 0, "Press 'q' to return to main menu")
         if self.last_key:
             self.stdscr.addstr(6, 0, f"Last key pressed: {self.last_key}")
@@ -95,12 +97,8 @@ class KeyboardController:
                 self.car_controller.manual_control(c)
             elif self.mode == "Arm Control":
                 self.arm_controller.manual_control(c)
-            elif self.mode == "Auto Nav":
-                # Auto Nav 模式下的按鍵處理（如果需要）
-                pass
-            elif self.mode == "Combined Control":
-                # 處理組合控制的按鍵
-                pass
+            elif self.mode == "Custom Control":
+                self.custom_control.manual_control(c)
             self.last_key = c
         finally:
             sys.stdout = old_stdout
@@ -146,7 +144,8 @@ def main():
     nav2_processing = Nav2Processing(ros_communicator, data_processor)
     car_controller = CarController(ros_communicator, nav2_processing)
     arm_controller = ArmController(ros_communicator, nav2_processing, num_joints = 5)
-    keyboard_controller = KeyboardController(stdscr, car_controller, arm_controller, default_vel=10)
+    custom_control = CustomControl(car_controller, arm_controller)
+    keyboard_controller = KeyboardController(stdscr, car_controller, arm_controller, custom_control, default_vel=10)
     
     while True:
         try:
@@ -156,7 +155,7 @@ def main():
                 stdscr.addstr(1, 0, "1. Car Control")
                 stdscr.addstr(2, 0, "2. Arm Control")
                 stdscr.addstr(3, 0, "3. Auto Nav")
-                stdscr.addstr(4, 0, "4. Combined Control")
+                stdscr.addstr(4, 0, "4. Custom Control")
                 stdscr.addstr(5, 0, "q. Quit")
                 stdscr.refresh()
 
@@ -164,7 +163,7 @@ def main():
                 if choice == ord('q'):
                     break
                 elif choice in [ord('1'), ord('2'), ord('3'), ord('4')]:
-                    mode = {ord('1'): "Car Control", ord('2'): "Arm Control", ord('3'): "Auto Nav", ord('4'): "Combined Control"}[choice]
+                    mode = {ord('1'): "Car Control", ord('2'): "Arm Control", ord('3'): "Auto Nav", ord('4'): "Custom Control"}[choice]
                     keyboard_controller.mode = mode
                     keyboard_controller.output_buffer = io.StringIO()  # 清空輸出緩衝區
                     keyboard_controller.run_mode()

@@ -1,5 +1,21 @@
 #!/bin/bash
 
+# Port mapping check
+PORT_MAPPING=""
+if [ "$1" = "--port" ] && [ -n "$2" ] && [ -n "$3" ]; then
+    PORT_MAPPING="-p $2:$3"
+    shift 3  # Remove the first three arguments
+fi
+
+# gpu check
+if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
+    echo "NVIDIA GPU detected"
+    GPU_FLAGS="--runtime nvidia --gpus all"
+else
+    echo "No NVIDIA GPU detected or NVIDIA drivers not installed"
+    GPU_FLAGS=""
+fi
+
 # 初始化device參數
 device_options=""
 
@@ -16,5 +32,12 @@ if [ -e /dev/usb_robot_arm ]; then
     device_options+=" --device=/dev/usb_robot_arm"
 fi
 
-# 建構完整指令
-docker run -it --rm -v "$(pwd)/src:/workspaces/src" --network compose_my_bridge_network $device_options --env-file ./.env ghcr.io/otischung/pros_ai_image:latest /bin/bash
+# run docker container
+docker run -it --rm \
+    -v "$(pwd)/src:/workspaces/src" \
+    --network compose_my_bridge_network \
+    --env-file ./.env \
+    $PORT_MAPPING \
+    $GPU_FLAGS \
+    ghcr.io/otischung/pros_ai_image:latest \
+    /bin/bash

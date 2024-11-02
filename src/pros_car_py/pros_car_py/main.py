@@ -44,40 +44,65 @@ class KeyboardController:
     def run_mode(self):
         """在特定模式下運行鍵盤控制邏輯"""
         self.stdscr.nodelay(True)
-        
         last_mode = None
+        
         while True:
             c = self.stdscr.getch()
             
-            # 處理自動模式
-            if self.mode in ["Auto Nav", "Auto Arm Control"]:
-                # 如果按下 q，確保正確停止並退出
-                if c == ord("q"):
-                    self.car_controller.auto_control(key=chr(c))
-                    self.stdscr.clear()
-                    break
-                # 其他情況下的自動控制
-                key = None
-                if self.car_controller.auto_control(key=key):
-                    self.stdscr.clear()
-                    break
-            # 處理其他模式的按鍵輸入
-            elif c != -1:
-                if c == ord("q"):
-                    self.stdscr.clear()
-                    break
-                self.handle_key_input(chr(c))
+            if self.process_auto_mode_input(c):
+                break
+                
+            self.process_manual_mode_input(c)
             
-            # 只在模式改變或有新輸入時更新顯示
-            if self.mode != last_mode or c != -1:
-                self.stdscr.clear()
-                self.display_mode_info()
-                self.stdscr.refresh()
+            # 更新顯示
+            if self._should_update_display(last_mode, c):
+                self._update_display()
                 last_mode = self.mode
-            
+                
             time.sleep(0.1)
         
-        # 退出模式時重置
+        self._reset_mode()
+
+    def process_auto_mode_input(self, c):
+        """處理自動模式的輸入"""
+        # 定義控制器映射
+        controller_map = {
+            "Auto Nav": self.car_controller,
+            "Auto Arm Control": self.arm_controller
+        }
+        
+        # 獲取當前模式的控制器
+        controller = controller_map.get(self.mode)
+        if not controller:
+            return False
+
+        # 處理退出命令
+        if c == ord("q"):
+            controller.auto_control(key='q')
+            self.stdscr.clear()
+            return True
+        
+        # 處理一般自動控制
+        controller.auto_control()
+        return False
+
+    def process_manual_mode_input(self, c):
+        """處理不同模式下的輸入"""
+        if c != -1:  # 有按鍵輸入時
+            self.handle_key_input(chr(c))
+
+    def _should_update_display(self, last_mode, c):
+        """判斷是否需要更新顯示"""
+        return self.mode != last_mode or c != -1
+
+    def _update_display(self):
+        """更新顯示內容"""
+        self.stdscr.clear()
+        self.display_mode_info()
+        self.stdscr.refresh()
+
+    def _reset_mode(self):
+        """重置模式相關的狀態"""
         self.mode = None
         self.output_buffer = io.StringIO()
         self.last_key = None

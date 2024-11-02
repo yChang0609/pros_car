@@ -138,8 +138,8 @@ class RobotIKSolver:
     
     def solve_ik(self, target_position, target_orientation=None):
         """求解逆運動學"""
-        print(f"\n開始 IK 求解...")
-        print(f"目標位置: {target_position}")
+        # print(f"\n開始 IK 求解...")
+        # print(f"目標位置: {target_position}")
         
         # 設置末端執行器索引
         end_effector_index = 5  # 需要根據實際機器人調整
@@ -150,7 +150,7 @@ class RobotIKSolver:
         
         # 獲取當前狀態
         current_joints = self.get_joint_states()
-        print(f"當前關節角度（度）: {np.degrees(current_joints)}")
+        # print(f"當前關節角度（度）: {np.degrees(current_joints)}")
         
         # 求解 IK
         joint_poses = p.calculateInverseKinematics(
@@ -199,17 +199,6 @@ class RobotIKSolver:
                 # 更新模擬
                 p.stepSimulation()
                 time.sleep(1./240.)  # 控制模擬速度
-                
-                # 打印進度
-                # if step % 10 == 0:
-                #     print(f"\n步驟 {step}/{steps}")
-                #     end_state = p.getLinkState(self.robot_id, 5)
-                #     print(f"當前位置: {end_state[0]}")
-                #     current_angles = self.get_joint_states()
-                #     print(f"當前關節角度（度）: {np.degrees(current_angles)}")
-            
-            # 驗證最終位置
-            end_state = p.getLinkState(self.robot_id, 5)
             return True  # Return the joint angles
         return False  # Return None if IK failed
     
@@ -217,34 +206,14 @@ class RobotIKSolver:
         """清理資源"""
         p.disconnect()
 
-    def get_joint_angles_degrees(self):
-        """Returns the current joint angles in degrees."""
+    def get_joint_angles_degrees(self) -> list[float]:
+        """Returns the current joint angles in degrees with 2 decimal places.
+        
+        Returns:
+            list[float]: List of joint angles in degrees, rounded to 2 decimal places
+        """
         joint_states = self.get_joint_states()
         joint_angles_degrees = np.degrees(joint_states)
-        return joint_angles_degrees
-
-# def main():
-#     try:
-#         # 創建控制器
-#         controller = RobotIKSolver()
-#         controller.set_all_joints_to_90_degrees()
-#         for i in range(50): 
-#             z = 0.2 + 0.1 * i
-#             target_position = [0.1, 0.0, z]
-#             success = controller.move_to_target(target_position)
-#             if success is not None:
-#                 print("\n移動到指定位置成功!")
-#             else:
-#                 print("\n移動到指定位置失敗!")
-#         input("\n機器人已移動到指定角度，按 Enter 繼續...")
-        
-#         controller.cleanup()
-        
-#     except Exception as e:
-#         print(f"\n發生錯誤: {str(e)}")
-#         import traceback
-#         traceback.print_exc()
-#         p.disconnect()
-
-# if __name__ == "__main__":
-#     main()
+        # 轉換為普通的 float list，並四捨五入到小數點後兩位
+        rounded_angles = [round(float(angle), 2) for angle in joint_angles_degrees]
+        return rounded_angles

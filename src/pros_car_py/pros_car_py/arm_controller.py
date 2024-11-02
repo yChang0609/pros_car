@@ -66,8 +66,9 @@ class ArmController():
         joint_angles_success = self.ik_solver.move_to_target(target_position)
         if joint_angles_success:
             joint_angles = self.ik_solver.get_joint_angles_degrees()
+            print(f"joint_angles: {joint_angles}")
             self.update_action(joint_angles)
-        self.ik_solver.cleanup()
+        # self.ik_solver.cleanup()
         
     def update_action(self, joint_pos):
         self.ros_communicator.publish_robot_arm_angle(joint_pos)

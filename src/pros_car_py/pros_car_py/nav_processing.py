@@ -32,5 +32,7 @@ class Nav2Processing:
                     action_key = "CLOCKWISE_ROTATION"
                 else:
                     action_key = "STOP"
-        return action_key        
+        return action_key   
     
+    def stop_nav(self):
+        return "STOP"

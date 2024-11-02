@@ -89,11 +89,23 @@ class CarController():
             self.update_action("STOP")
         else:
             pass
-    def auto_control(self, mode, target = None):
-        if mode == "auto_nav":
-            action_key = self.nav_processing.get_action_from_nav2_plan(goal_coordinates = None)
+    def auto_control(self, mode="auto_nav", target=None, key=None):
+        """
+        自動控制邏輯
+        Args:
+            mode: 控制模式 ("auto_nav" 或 "manual_nav")
+            target: 目標座標 (用於 manual_nav 模式)
+            key: 鍵盤輸入
+        """
+        # 如果有按鍵輸入
+        if key == "q":
+            # 按下 q 時停止導航並退出
+            action_key = self.nav_processing.stop_nav()
             self.ros_communicator.publish_car_control(action_key, publish_rear=True, publish_front=True)
-        elif mode == "manual_nav":
-            action_key = self.nav_processing.get_action_from_nav2_plan(goal_coordinates = target)
+        # 根據模式執行導航
+        else:
+            if mode == "auto_nav":
+                action_key = self.nav_processing.get_action_from_nav2_plan(goal_coordinates=None)
+            elif mode == "manual_nav":
+                action_key = self.nav_processing.get_action_from_nav2_plan(goal_coordinates=target)
             self.ros_communicator.publish_car_control(action_key, publish_rear=True, publish_front=True)
-        pass

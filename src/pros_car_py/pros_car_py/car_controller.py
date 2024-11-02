@@ -88,8 +88,7 @@ class CarController():
         elif key == 'z':
             self.update_action("STOP")
         else:
-            self.get_logger().info(f"Invalid key: {key}")
-    
+            pass
     def auto_control(self, mode, target = None):
         if mode == "auto_nav":
             action_key = self.nav_processing.get_action_from_nav2_plan(goal_coordinates = None)

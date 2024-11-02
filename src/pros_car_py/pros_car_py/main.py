@@ -9,9 +9,11 @@ from pros_car_py.arm_controller import ArmController
 from pros_car_py.data_processor import DataProcessor
 from pros_car_py.nav_processing import Nav2Processing
 from pros_car_py.ros_communicator import RosCommunicator
+from pros_car_py.custom_control import CustomControl
+from pros_car_py.ik_solver import RobotIKSolver
 import io
 import sys
-from pros_car_py.custom_control import CustomControl
+
 class KeyboardController:
     """鍵盤控制邏輯，專注於定義按鍵與控制行為的對應"""
 
@@ -31,6 +33,8 @@ class KeyboardController:
         self.output_buffer = io.StringIO()
         self.auto_nav_thread = None
         self.auto_nav_running = False
+        self.auto_arm_thread = None
+        self.auto_arm_running = False
 
     def run_mode(self):
         """在特定模式下運行鍵盤控制邏輯"""
@@ -38,6 +42,8 @@ class KeyboardController:
         self.stdscr.nodelay(True)  # 設置為非阻塞模式
         if self.mode == "Auto Nav":
             self.start_auto_nav()
+        elif self.mode == "Auto Arm Control":
+            self.start_auto_arm()
         
         while True:
             if self.mode in ["Car Control", "Arm Control"]:
@@ -49,6 +55,8 @@ class KeyboardController:
             if c == ord("q"):
                 if self.auto_nav_thread:
                     self.stop_auto_nav()
+                if self.auto_arm_thread:
+                    self.stop_auto_arm()
                 break
             elif c != -1:
                 self.handle_key_input(chr(c))
@@ -97,6 +105,8 @@ class KeyboardController:
                 self.car_controller.manual_control(c)
             elif self.mode == "Arm Control":
                 self.arm_controller.manual_control(c)
+            elif self.mode == "Auto Arm Control":
+                self.arm_controller.auto_control()
             elif self.mode == "Custom Control":
                 self.custom_control.manual_control(c)
             self.last_key = c
@@ -130,6 +140,29 @@ class KeyboardController:
             self.display_other_mode_info()
             time.sleep(0.1)  # 控制更新頻率
 
+    def start_auto_arm(self):
+        if not self.auto_arm_thread:
+            self.auto_arm_running = True
+            self.auto_arm_thread = threading.Thread(target=self.run_auto_arm)
+            self.auto_arm_thread.start()
+
+    def stop_auto_arm(self):
+        if self.auto_arm_thread:
+            self.auto_arm_running = False
+            self.auto_arm_thread.join()
+            self.auto_arm_thread = None
+
+    def run_auto_arm(self):
+        while self.auto_arm_running and rclpy.ok():
+            old_stdout = sys.stdout
+            sys.stdout = self.output_buffer
+            try:
+                self.arm_controller.auto_control()
+            finally:
+                sys.stdout = old_stdout
+            self.display_other_mode_info()
+            time.sleep(0.1)  # 控制更新頻率
+
 def init_ros_node():
     rclpy.init()
     node = RosCommunicator()
@@ -143,7 +176,8 @@ def main():
     data_processor = DataProcessor(ros_communicator)
     nav2_processing = Nav2Processing(ros_communicator, data_processor)
     car_controller = CarController(ros_communicator, nav2_processing)
-    arm_controller = ArmController(ros_communicator, nav2_processing, num_joints = 5)
+    ik_solver = RobotIKSolver()
+    arm_controller = ArmController(ros_communicator, nav2_processing, ik_solver, num_joints = 5)
     custom_control = CustomControl(car_controller, arm_controller)
     keyboard_controller = KeyboardController(stdscr, car_controller, arm_controller, custom_control, default_vel=10)
     
@@ -155,15 +189,16 @@ def main():
                 stdscr.addstr(1, 0, "1. Car Control")
                 stdscr.addstr(2, 0, "2. Arm Control")
                 stdscr.addstr(3, 0, "3. Auto Nav")
-                stdscr.addstr(4, 0, "4. Custom Control")
-                stdscr.addstr(5, 0, "q. Quit")
+                stdscr.addstr(4, 0, "4. Auto Arm Control")
+                stdscr.addstr(5, 0, "5. Custom Control")
+                stdscr.addstr(6, 0, "q. Quit")
                 stdscr.refresh()
 
                 choice = stdscr.getch()
                 if choice == ord('q'):
                     break
-                elif choice in [ord('1'), ord('2'), ord('3'), ord('4')]:
-                    mode = {ord('1'): "Car Control", ord('2'): "Arm Control", ord('3'): "Auto Nav", ord('4'): "Custom Control"}[choice]
+                elif choice in [ord('1'), ord('2'), ord('3'), ord('4'), ord('5')]:
+                    mode = {ord('1'): "Car Control", ord('2'): "Arm Control", ord('3'): "Auto Nav", ord('4'): "Auto Arm Control", ord('5'): "Custom Control"}[choice]
                     keyboard_controller.mode = mode
                     keyboard_controller.output_buffer = io.StringIO()  # 清空輸出緩衝區
                     keyboard_controller.run_mode()

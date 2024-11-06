@@ -94,15 +94,13 @@ class ArmController():
                 #     time.sleep(0.1)
 
                 # 隨機波動
-                joint_angle_sequences = self.ik_solver.random_wave(num_moves=5, steps=50)  # 獲取隨機波動角度序列
+                joint_angle_sequences = self.ik_solver.random_wave(num_moves=5, steps=20)  # 獲取隨機波動角度序列
                 for joint_angles in joint_angle_sequences:
                     self.ik_solver.setJointPosition(joint_angles)
                     joint_angle = self.set_all_joint_angles(joint_angles)
                     self.update_action(joint_angle)
                     time.sleep(0.1)
 
-            self.ik_solver.stop_simulation()
-            return True
 
 
     

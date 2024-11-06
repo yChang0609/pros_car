@@ -26,6 +26,7 @@ class KeyboardController:
         self.mode = None
         self.output_buffer = io.StringIO()
         self.last_key = None
+        self.auto_mode = None
 
 
 
@@ -45,14 +46,20 @@ class KeyboardController:
         """在特定模式下運行鍵盤控制邏輯"""
         self.stdscr.nodelay(True)
         last_mode = None
-        
+        if self.mode == "Auto Nav":
+         self.auto_mode = "auto_nav"
+        elif self.mode == "Auto Arm Control":
+            self.auto_mode = "auto_arm_control"
+        else:
+            self.auto_mode = None  # 手動模式下不需要自動模式參數
         while True:
             c = self.stdscr.getch()
             
             if self.process_auto_mode_input(c):
                 break
                 
-            self.process_manual_mode_input(c)
+            if self.process_manual_mode_input(c):
+                break
             
             # 更新顯示
             if self._should_update_display(last_mode, c):
@@ -81,15 +88,20 @@ class KeyboardController:
             controller.auto_control(key='q')
             self.stdscr.clear()
             return True
-        
+
         # 處理一般自動控制
-        controller.auto_control()
+        controller.auto_control(mode=self.auto_mode)
         return False
 
     def process_manual_mode_input(self, c):
         """處理不同模式下的輸入"""
-        if c != -1:  # 有按鍵輸入時
+        if c == ord('q'):  # 如果按下 q 鍵，退出到主選單
             self.handle_key_input(chr(c))
+            self.stdscr.clear()
+            return True  # 返回 True 終止 run_mode 的循環
+        elif c != -1:  # 有其他按鍵輸入時
+            self.handle_key_input(chr(c))
+        return False
 
     def _should_update_display(self, last_mode, c):
         """判斷是否需要更新顯示"""
@@ -161,10 +173,10 @@ class KeyboardController:
                 self.car_controller.manual_control(c)
             elif self.mode == "Arm Control":
                 self.arm_controller.manual_control(c)
-            elif self.mode == "Auto Nav":
-                self.car_controller.auto_control(key=c)
-            elif self.mode == "Auto Arm Control":
-                self.arm_controller.auto_control(key=c)
+            # elif self.mode == "Auto Nav":
+            #     self.car_controller.auto_control(key=c, mode=self.auto_mode)
+            # elif self.mode == "Auto Arm Control":
+            #     self.arm_controller.auto_control(key=c)
             elif self.mode == "Custom Control":
                 self.custom_control.manual_control(c)
             self.last_key = c

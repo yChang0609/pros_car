@@ -87,8 +87,11 @@ class CarController():
             self.update_action("CLOCKWISE_ROTATION")
         elif key == 'z':
             self.update_action("STOP")
+        elif key == 'q':
+            self.update_action("STOP")
         else:
             pass
+
     def auto_control(self, mode="auto_nav", target=None, key=None):
         """
         自動控制邏輯

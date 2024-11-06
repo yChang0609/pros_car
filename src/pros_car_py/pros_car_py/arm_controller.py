@@ -28,14 +28,14 @@ class ArmController():
             Resets all joints of the robotic arm to their default positions.
     """
 
-    def __init__(self, ros_communicator, nav_processing, ik_solver, num_joints = 4):
+    def __init__(self, ros_communicator, ik_solver, num_joints = 4):
         self.ros_communicator = ros_communicator
-        self.nav_processing = nav_processing
         self.ik_solver = ik_solver
         self.num_joints = num_joints
         self.joint_pos = []
         self.set_all_joint_positions(0.0)
-    
+        
+
     def manual_control(self, key):
         if key == 'b': # Reset arm
             self.reset_arm(all_angle_degrees = 90.0)
@@ -60,15 +60,21 @@ class ArmController():
         elif key == 'o':
             self.adjust_joint_angle(joint_id = 4, delta_angle = -10, min_angle=10, max_angle=70)
         self.update_action(self.joint_pos)
-    
-    def auto_control(self, target_position=[0.1, 0.0, 0.2]):
-        target_position = [0.1, 0.0, 0.2]
-        joint_angles_success = self.ik_solver.move_to_target(target_position)
-        if joint_angles_success:
-            joint_angles = self.ik_solver.get_joint_angles_degrees()
-            print(f"joint_angles: {joint_angles}")
-            self.update_action(joint_angles)
-        # self.ik_solver.cleanup()
+        
+    def auto_control(self, key=None):
+        if key == "q":
+            self.ik_solver.stop_simulation()
+        else:
+            target_position = [0.3, -0.2, 0.2]
+            self.ik_solver.createWorld(GUI=True)
+            base_position = self.ik_solver.get_base_position()
+            target_position = [
+                base_position[0] + target_position[0], 
+                base_position[1] + target_position[1], 
+                base_position[2] + target_position[2]
+            ]
+            self.ik_solver.setJointPosition([1.57, 1.57, 1.57, 1.57, 1.57])
+            self.ik_solver.moveTowardsTarget(target_position)
         
     def update_action(self, joint_pos):
         self.ros_communicator.publish_robot_arm_angle(joint_pos)

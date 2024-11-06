@@ -12,7 +12,7 @@ from pros_car_py.data_processor import DataProcessor
 from pros_car_py.nav_processing import Nav2Processing
 from pros_car_py.ros_communicator import RosCommunicator
 from pros_car_py.custom_control import CustomControl
-from pros_car_py.ik_solver import RobotIKSolver
+from pros_car_py.ik_solver import PybulletRobotController
 import logging
 class KeyboardController:
     """鍵盤控制邏輯，專注於定義按鍵與控制行為的對應"""
@@ -184,9 +184,9 @@ def main():
     ros_communicator, ros_thread = init_ros_node()
     data_processor = DataProcessor(ros_communicator)
     nav2_processing = Nav2Processing(ros_communicator, data_processor)
+    ik_solver = PybulletRobotController(end_eff_index=5)
     car_controller = CarController(ros_communicator, nav2_processing)
-    ik_solver = RobotIKSolver()
-    arm_controller = ArmController(ros_communicator, nav2_processing, ik_solver, num_joints=5)
+    arm_controller = ArmController(ros_communicator, ik_solver, num_joints=5)
     custom_control = CustomControl(car_controller, arm_controller)
     keyboard_controller = KeyboardController(stdscr, car_controller, arm_controller, custom_control, default_vel=10)
     

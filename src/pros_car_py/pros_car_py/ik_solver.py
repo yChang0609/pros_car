@@ -71,7 +71,7 @@ class RobotIKSolver:
         """載入機器人模型"""
         # 獲取 URDF 路徑
         # urdf_path = os.path.abspath("./excurate_arm/target.urdf")
-        urdf_path = os.path.join(get_package_share_directory('pros_car_py'), 'urdf', 'excurate_arm', 'target.urdf')
+        urdf_path = os.path.join(get_package_share_directory('robot_description'), 'urdf', 'target.urdf')
         print(f"載入 URDF: {urdf_path}")
         
         
@@ -164,9 +164,10 @@ class RobotIKSolver:
         
         return joint_poses
     
-    def move_to_target(self, target_position, steps=50):
+    def move_to_target(self, target_position, steps=1000):
         """移動到目標位置"""
         # 求解 IK
+        self.add_target_marker(target_position)
         joint_poses = self.solve_ik(target_position)
         
         if joint_poses is not None:
@@ -177,8 +178,8 @@ class RobotIKSolver:
             joint_poses = list(joint_poses)
             
             # 確保最後兩個關節角度相同
-            if len(joint_poses) >= 2:
-                joint_poses[-1] = joint_poses[-2] = joint_poses[-1]  # 設置最後兩個關節角度相同
+            # if len(joint_poses) >= 2:
+            #     joint_poses[-1] = joint_poses[-2] = joint_poses[-1]  # 設置最後兩個關節角度相同
             
             # 獲取當前關節角度
             current_joints = self.get_joint_states()
@@ -201,6 +202,15 @@ class RobotIKSolver:
                 time.sleep(1./240.)  # 控制模擬速度
             return True  # Return the joint angles
         return False  # Return None if IK failed
+    def add_target_marker(self, position):
+        """在目標位置添加簡單的紅色標記"""
+        # 添加一個小紅線作為標記
+        p.addUserDebugLine(
+            [position[0], position[1], position[2]], 
+            [position[0], position[1], position[2] + 0.1],  # 0.1m 高的紅色標記
+            [1, 0, 0], 
+            lineWidth=3
+        )
     
     def cleanup(self):
         """清理資源"""

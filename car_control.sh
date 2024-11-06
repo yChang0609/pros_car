@@ -41,5 +41,6 @@ docker run -it --rm \
     --env-file ./.env \
     $PORT_MAPPING \
     $GPU_FLAGS \
+    $device_options \
     ghcr.io/otischung/pros_ai_image_pybullet:latest \
     /bin/bash

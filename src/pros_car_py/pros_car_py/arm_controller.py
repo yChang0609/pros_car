@@ -73,7 +73,7 @@ class ArmController():
         else:
             if mode == "auto_arm_control":
                 target_position = [0.3, -0.2, 0.2]
-                self.ik_solver.createWorld(GUI=True)
+                self.ik_solver.createWorld(GUI=False)
                 base_position = self.ik_solver.get_base_position()
                 target_position = [
                     base_position[0] + target_position[0], 
@@ -94,7 +94,7 @@ class ArmController():
                 #     time.sleep(0.1)
 
                 # 隨機波動
-                joint_angle_sequences = self.ik_solver.random_wave(num_moves=5, steps=20)  # 獲取隨機波動角度序列
+                joint_angle_sequences = self.ik_solver.random_wave(num_moves=5, steps=10)  # 獲取隨機波動角度序列
                 for joint_angles in joint_angle_sequences:
                     self.ik_solver.setJointPosition(joint_angles)
                     joint_angle = self.set_all_joint_angles(joint_angles)

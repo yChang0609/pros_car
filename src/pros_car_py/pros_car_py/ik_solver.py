@@ -16,11 +16,13 @@ import pybullet as p
 import pybullet_data
 import numpy as np
 import time
+import random
 import os
 from ament_index_python.packages import get_package_share_directory
+import xml.etree.ElementTree as ET
 
 class PybulletRobotController:
-    def __init__(self, robot_type = 'ur5', controllable_joints = None, end_eff_index = None, time_step = 1e-3):
+    def __init__(self, robot_type = 'ur5', initial_height = 0.195, controllable_joints = None, end_eff_index = None, time_step = 1e-3):
         self.robot_type = robot_type
         robot_description_path = get_package_share_directory('robot_description')
         self.urdf_path = os.path.join(robot_description_path, 'urdf', 'target.urdf')
@@ -30,6 +32,12 @@ class PybulletRobotController:
         self.end_eff_index = end_eff_index
         self.time_step = time_step
         self.previous_ee_position = None
+        self.initial_height = initial_height  # 新增的高度參數
+
+        # 讀取並初始化關節限制
+        self.joint_limits = self.get_joint_limits_from_urdf()
+        self.num_joints = len(self.joint_limits)  # 使用關節數量設定
+
     # function to initiate pybullet and engine and create world
     def createWorld(self, GUI=True, view_world=False):
         # load pybullet physics engine
@@ -48,7 +56,7 @@ class PybulletRobotController:
 
         #loading robot into the environment
         urdf_file = 'urdf/' + self.robot_type + '.urdf'
-        self.robot_id = p.loadURDF(self.urdf_path, useFixedBase=True)
+        self.robot_id = p.loadURDF(self.urdf_path, useFixedBase=True, basePosition=[0, 0, self.initial_height])
 
         self.num_joints = p.getNumJoints(self.robot_id) # Joints
         print('#Joints:',self.num_joints)
@@ -94,6 +102,63 @@ class PybulletRobotController:
     def get_base_position(self):
         base_position, base_orientation = p.getBasePositionAndOrientation(self.robot_id)
         return base_position
+
+    def get_joint_limits_from_urdf(self):
+        """
+        從 URDF 文件中讀取每個關節的範圍限制。
+        
+        Returns:
+            joint_limits (dict): 包含每個關節的最小和最大角度限制。
+        """
+        joint_limits = {}
+        tree = ET.parse(self.urdf_path)
+        root = tree.getroot()
+        for joint in root.findall("joint"):
+            joint_name = joint.get("name")
+            
+            # 忽略特定的夹具关节，比如 "gripper_joint"
+            if joint_name == "Revolute 6":
+                continue
+            
+            joint_type = joint.get("type")
+            if joint_type == "revolute" or joint_type == "continuous":
+                limit = joint.find("limit")
+                if limit is not None:
+                    lower = float(limit.get("lower", -3.14159))  # 預設為 -180 度（以 radians 為單位）
+                    upper = float(limit.get("upper", 3.14159))   # 預設為 180 度
+                    joint_limits[joint_name] = (lower, upper)
+        return joint_limits
+
+    
+    def random_wave(self, num_moves=5, steps=50):
+        # 檢查 joint_limits 長度是否和可控關節數量一致
+        if len(self.joint_limits) != len(self.controllable_joints):
+            raise ValueError("關節數量與 joint_limits 數量不匹配")
+
+        angle_sequence = []  # 用於存儲所有的角度組合
+        current_positions = np.array(self.getJointStates()[0])  # 初始關節角度
+        
+        for _ in range(num_moves):
+            # 生成一組新的目標角度
+            target_positions = [
+                random.uniform(lower, upper) for lower, upper in self.joint_limits.values()
+            ]
+            target_positions = np.array(target_positions)
+            
+            # 確認 target_positions 與 current_positions 的形狀匹配
+            if current_positions.shape != target_positions.shape:
+                raise ValueError("生成的目標角度數量與當前角度數量不一致")
+
+            # 平滑過渡：生成插值角度，過渡到下一組目標角度
+            for step in range(steps):
+                intermediate_positions = (1 - step / steps) * current_positions + (step / steps) * target_positions
+                angle_sequence.append(intermediate_positions.tolist())  # 添加到序列中
+
+            # 更新當前位置為目標位置，以便下一次的平滑過渡
+            current_positions = target_positions
+
+        return angle_sequence  # 返回所有角度組合
+
 
     def markTarget(self, target_position):
         # 使用紅色標記顯示目標位置

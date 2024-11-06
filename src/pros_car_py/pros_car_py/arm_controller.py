@@ -66,12 +66,14 @@ class ArmController():
         
     def auto_control(self, key=None, mode="auto_arm_control"):
         if key == "q":
+            self.reset_arm(all_angle_degrees = 90.0)
+            self.update_action(self.joint_pos)
             self.ik_solver.stop_simulation()
             return True
         else:
             if mode == "auto_arm_control":
                 target_position = [0.3, -0.2, 0.2]
-                self.ik_solver.createWorld(GUI=False)
+                self.ik_solver.createWorld(GUI=True)
                 base_position = self.ik_solver.get_base_position()
                 target_position = [
                     base_position[0] + target_position[0], 
@@ -79,16 +81,31 @@ class ArmController():
                     base_position[2] + target_position[2]
                 ]
                 self.ik_solver.setJointPosition([1.57, 1.57, 1.57, 1.57, 1.57])
-                joint_angle = self.ik_solver.solveInversePositionKinematics(target_position)
-                self.update_action(joint_angle)
-                self.ik_solver.stop_simulation()
+                # 只取得關節角度
+                # joint_angle = self.ik_solver.solveInversePositionKinematics(target_position)
+                # self.update_action(joint_angle)
+                # self.ik_solver.stop_simulation()
+
+                # 取得漸進角度
                 # joint_angles_in_degrees = self.ik_solver.moveTowardsTarget(target_position)
                 # for i in joint_angles_in_degrees:
                 #     joint_angle = self.set_all_joint_angles(i)
                 #     self.update_action(joint_angle)
                 #     time.sleep(0.1)
+
+                # 隨機波動
+                joint_angle_sequences = self.ik_solver.random_wave(num_moves=5, steps=50)  # 獲取隨機波動角度序列
+                for joint_angles in joint_angle_sequences:
+                    self.ik_solver.setJointPosition(joint_angles)
+                    joint_angle = self.set_all_joint_angles(joint_angles)
+                    self.update_action(joint_angle)
+                    time.sleep(0.1)
+
+            self.ik_solver.stop_simulation()
             return True
 
+
+    
     def set_all_joint_angles(self, angles_degrees):
         """
         Sets all joints to the specified angles in degrees.

@@ -1,8 +1,9 @@
+# return 角度一律 radians
 import math
 from rclpy.node import Node
 from pros_car_py.car_models import DeviceDataTypeEnum
 import numpy as np
-
+import time
 class ArmController():
     """
     A class to control a robotic arm.
@@ -59,22 +60,56 @@ class ArmController():
             self.adjust_joint_angle(joint_id = 4, delta_angle = 10, min_angle=10, max_angle=70)
         elif key == 'o':
             self.adjust_joint_angle(joint_id = 4, delta_angle = -10, min_angle=10, max_angle=70)
+        elif key == 'q':
+            return True
         self.update_action(self.joint_pos)
         
-    def auto_control(self, key=None):
+    def auto_control(self, key=None, mode="auto_arm_control"):
         if key == "q":
             self.ik_solver.stop_simulation()
+            return True
         else:
-            target_position = [0.3, -0.2, 0.2]
-            self.ik_solver.createWorld(GUI=True)
-            base_position = self.ik_solver.get_base_position()
-            target_position = [
-                base_position[0] + target_position[0], 
-                base_position[1] + target_position[1], 
-                base_position[2] + target_position[2]
-            ]
-            self.ik_solver.setJointPosition([1.57, 1.57, 1.57, 1.57, 1.57])
-            self.ik_solver.moveTowardsTarget(target_position)
+            if mode == "auto_arm_control":
+                target_position = [0.3, -0.2, 0.2]
+                self.ik_solver.createWorld(GUI=False)
+                base_position = self.ik_solver.get_base_position()
+                target_position = [
+                    base_position[0] + target_position[0], 
+                    base_position[1] + target_position[1], 
+                    base_position[2] + target_position[2]
+                ]
+                self.ik_solver.setJointPosition([1.57, 1.57, 1.57, 1.57, 1.57])
+                joint_angle = self.ik_solver.solveInversePositionKinematics(target_position)
+                self.update_action(joint_angle)
+                self.ik_solver.stop_simulation()
+                # joint_angles_in_degrees = self.ik_solver.moveTowardsTarget(target_position)
+                # for i in joint_angles_in_degrees:
+                #     joint_angle = self.set_all_joint_angles(i)
+                #     self.update_action(joint_angle)
+                #     time.sleep(0.1)
+            return True
+
+    def set_all_joint_angles(self, angles_degrees):
+        """
+        Sets all joints to the specified angles in degrees.
+
+        Args:
+            angles_degrees (list[float]): A list of angles in degrees for each joint.
+        
+        Example:
+            >>> self.set_all_joint_angles([30, 45, 90, 60])
+        """
+        # 確保提供的角度數量與關節數一致
+        if len(angles_degrees) != self.num_joints:
+            raise ValueError("The number of angles provided does not match the number of joints.")
+        
+        # 將每個角度設置到對應的關節
+        for i, angle in enumerate(angles_degrees):
+            self.joint_pos[i] = angle
+        
+        # 更新機器人位置
+        return self.joint_pos
+
         
     def update_action(self, joint_pos):
         self.ros_communicator.publish_robot_arm_angle(joint_pos)

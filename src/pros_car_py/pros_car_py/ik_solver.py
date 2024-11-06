@@ -79,7 +79,7 @@ class PybulletRobotController:
 
     # function for setting joint positions of robot
     def setJointPosition(self, position, kp=1.0, kv=1.0):
-        print('Joint position controller')
+        # print('Joint position controller')
         zero_vec = [0.0] * len(self.controllable_joints)
         p.setJointMotorControlArray(self.robot_id,
                                     self.controllable_joints,
@@ -134,6 +134,10 @@ class PybulletRobotController:
         # 計算每一步的位移向量
         step_vector = (np.array(target_position) - np.array(current_position)) / steps
         self.markTarget(target_position)
+        
+        # 用於存儲每一步的關節角度（以弧度表示）
+        joint_angles_in_radians = []
+
         # 逐步靠近目標
         for i in range(steps):
             # 計算當前目標位置
@@ -143,20 +147,26 @@ class PybulletRobotController:
             
             # 將當前關節角度應用到機器人
             if joint_angles and len(joint_angles) >= len(self.controllable_joints):
+                # 直接存儲弧度值
+                joint_angles_in_radians.append(joint_angles[:len(self.controllable_joints)])
+                
                 self.setJointPosition(joint_angles[:len(self.controllable_joints)])
-                # self.markEndEffector()
                 time.sleep(0.1)  # 加入延遲觀察
             else:
                 print("無法找到合適的解。")
                 break
+        
+        return joint_angles_in_radians
+
+
     # function to solve inverse kinematics
     def solveInversePositionKinematics(self, end_eff_pose):
-        print('Inverse position kinematics')
+        # print('Inverse position kinematics')
         joint_angles =  p.calculateInverseKinematics(self.robot_id,
                                                     self.end_eff_index,
                                                     targetPosition=end_eff_pose[0:3])
                                                     # targetOrientation=p.getQuaternionFromEuler(end_eff_pose[3:6]))
-        print('Joint angles:', joint_angles)
+        # print('Joint angles:', joint_angles)
         # self.markTarget(end_eff_pose[0:3])
         self.markEndEffectorPath()  # 標記末端執行器位置
         return joint_angles
@@ -414,7 +424,7 @@ class PybulletRobotController:
         p.disconnect()
 
     def stop_simulation(self):
-        p.setRealTimeSimulation(False)
+        # p.setRealTimeSimulation(False)
         p.disconnect()
 
     # Function to do impedence control in task space

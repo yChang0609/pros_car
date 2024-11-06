@@ -56,6 +56,7 @@ class KeyboardController:
             c = self.stdscr.getch()
             
             if self.process_auto_mode_input(c):
+                self.stdscr.clear()
                 break
                 
             if self.process_manual_mode_input(c):

@@ -1,4 +1,5 @@
 from pros_car_py.nav2_utils import get_yaw_from_quaternion, cal_distance
+import time
 
 class Nav2Processing:
     def __init__(self, ros_communicator, data_processor):
@@ -20,7 +21,7 @@ class Nav2Processing:
                 car_orientation_z, car_orientation_w = car_orientation[2], car_orientation[3]
                 goal_position = self.ros_communicator.get_latest_goal()
                 target_distance = cal_distance(car_position, goal_position)
-                if target_distance < 0.3:
+                if target_distance < 0.5:
                     action_key = "STOP"
                 else:
                     car_yaw = get_yaw_from_quaternion(car_orientation_z, car_orientation_w)
@@ -35,6 +36,7 @@ class Nav2Processing:
                         action_key = "STOP"
             except:
                 action_key = "STOP"
+        time.sleep(0.1)
         return action_key   
     
     def stop_nav(self):

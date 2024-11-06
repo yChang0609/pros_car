@@ -47,7 +47,7 @@ class KeyboardController:
         self.stdscr.nodelay(True)
         last_mode = None
         if self.mode == "Auto Nav":
-         self.auto_mode = "auto_nav"
+            self.auto_mode = "auto_nav"
         elif self.mode == "Auto Arm Control":
             self.auto_mode = "auto_arm_control"
         else:
@@ -88,10 +88,9 @@ class KeyboardController:
             controller.auto_control(key='q')
             self.stdscr.clear()
             return True
-
+        should_exit = controller.auto_control(mode=self.auto_mode)
         # 處理一般自動控制
-        controller.auto_control(mode=self.auto_mode)
-        return False
+        return should_exit
 
     def process_manual_mode_input(self, c):
         """處理不同模式下的輸入"""

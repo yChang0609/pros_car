@@ -89,6 +89,7 @@ class CarController():
             self.update_action("STOP")
         elif key == 'q':
             self.update_action("STOP")
+            return True
         else:
             pass
 
@@ -105,6 +106,7 @@ class CarController():
             # 按下 q 時停止導航並退出
             action_key = self.nav_processing.stop_nav()
             self.ros_communicator.publish_car_control(action_key, publish_rear=True, publish_front=True)
+            return True
         # 根據模式執行導航
         else:
             if mode == "auto_nav":

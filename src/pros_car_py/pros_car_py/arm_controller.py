@@ -4,6 +4,9 @@ from rclpy.node import Node
 from pros_car_py.car_models import DeviceDataTypeEnum
 import numpy as np
 import time
+import sys
+from scipy.spatial.transform import Rotation as R
+
 class ArmController():
     """
     A class to control a robotic arm.
@@ -29,12 +32,15 @@ class ArmController():
             Resets all joints of the robotic arm to their default positions.
     """
 
-    def __init__(self, ros_communicator, ik_solver, num_joints = 4):
+    def __init__(self, ros_communicator, data_processor, ik_solver, num_joints = 4):
         self.ros_communicator = ros_communicator
+        self.data_processor = data_processor
         self.ik_solver = ik_solver
         self.num_joints = num_joints
         self.joint_pos = []
+        self.key = 0
         self.set_all_joint_positions(0.0)
+        self.world_created = False
         
 
     def manual_control(self, key):
@@ -68,43 +74,100 @@ class ArmController():
         if key == "q":
             self.reset_arm(all_angle_degrees = 90.0)
             self.update_action(self.joint_pos)
-            self.ik_solver.stop_simulation()
+            # self.ik_solver.stop_simulation()
             return True
         else:
             if mode == "auto_arm_control":
-                target_position = [0.3, -0.2, 0.2]
-                self.ik_solver.createWorld(GUI=False)
-                base_position = self.ik_solver.get_base_position()
-                target_position = [
-                    base_position[0] + target_position[0], 
-                    base_position[1] + target_position[1], 
-                    base_position[2] + target_position[2]
-                ]
+                if not self.world_created:
+                    self.ik_solver.createWorld(GUI=True)
+                    self.world_created = True
                 self.ik_solver.setJointPosition([1.57, 1.57, 1.57, 1.57, 1.57])
-                # 只取得關節角度
+                self.ik_solver.markDepthCameraPosition(offset=0.01)
+                target_position_base = [0.1,0.1,0.1]
+                # yolo_coordinates = self.data_processor.get_processed_yolo_detection_position()
+
+                 # 假設相機與末端執行器之間的相對位姿
+                camera_position = [0, 0, 0.1]  # 相機在末端的 10cm 上方
+                camera_rotation = R.from_euler('xyz', [0, 0, 0]).as_matrix()
+                
+                # 從基座坐標獲取末端位姿
+                # end_effector_position, end_effector_orientation, _ = self.ik_solver.get_end_effector_state()
+                # end_effector_rotation = R.from_quat(end_effector_orientation).as_matrix()
+
+                # 計算 YOLO 偵測到的目標在基座坐標系中的位置
+                # target_position_base = self.transform_camera_to_base(
+                #     camera_position,
+                #     camera_rotation,
+                #     end_effector_position,
+                #     end_effector_rotation,
+                #     yolo_coordinates
+                # )
+
+
+                
+                # # 只取得關節角度
                 # joint_angle = self.ik_solver.solveInversePositionKinematics(target_position)
                 # self.update_action(joint_angle)
-                # self.ik_solver.stop_simulation()
 
+                # print("Press Enter to continue...")
+                # sys.stdin.read(1)  # 读取一个字符，Enter 键
+                # print("Continuing...")
+                # self.ik_solver.stop_simulation()
+                # return True
                 # 取得漸進角度
-                # joint_angles_in_degrees = self.ik_solver.moveTowardsTarget(target_position)
+
+                # joint_angles_in_degrees = self.ik_solver.moveTowardsTarget(target_position_base)
                 # for i in joint_angles_in_degrees:
                 #     joint_angle = self.set_all_joint_angles(i)
                 #     self.update_action(joint_angle)
                 #     time.sleep(0.1)
+                # self.ik_solver.stop_simulation()
+                # return True
 
                 # 隨機波動
-                joint_angle_sequences = self.ik_solver.human_like_wave(num_moves=5, steps=20)  # 獲取隨機波動角度序列
-                for joint_angles in joint_angle_sequences:
-                    joint_angles[-1] = math.radians(10)
-                    self.ik_solver.setJointPosition(joint_angles)
-                    joint_angle = self.set_all_joint_angles(joint_angles)
-                    self.update_action(joint_angle)
-                    time.sleep(0.01)
+                # joint_angle_sequences = self.ik_solver.human_like_wave(num_moves=5, steps=20)  # 獲取隨機波動角度序列
+                # for joint_angles in joint_angle_sequences:
+                #     joint_angles[-1] = math.radians(10)
+                #     self.ik_solver.setJointPosition(joint_angles)
+                #     joint_angle = self.set_all_joint_angles(joint_angles)
+                #     self.update_action(joint_angle)
+                #     time.sleep(0.01)
 
 
+    def transform_camera_to_base(self, camera_position, camera_rotation, end_effector_position, end_effector_rotation, yolo_coordinates):
+        # 定义从相机坐标系到PyBullet坐标系的旋转矩阵
+        coordinate_transform = np.array([
+            [0, 0, 1],
+            [1, 0, 0],
+            [0, -1, 0]
+        ])
+        
+        # 将YOLO的坐标转换为PyBullet坐标系
+        yolo_coords = np.array([yolo_coordinates[0], yolo_coordinates[1], yolo_coordinates[2]])
+        pybullet_coords = coordinate_transform @ yolo_coords
+        
+        # 将转换后的坐标扩展为齐次坐标
+        target_position_camera = np.array([pybullet_coords[0], pybullet_coords[1], pybullet_coords[2], 1])
+        
+        # 更新相机到末端的旋转矩阵
+        camera_rotation = coordinate_transform @ camera_rotation
 
-    
+        # 相机到末端的齐次变换矩阵
+        camera_to_end_effector = np.eye(4)
+        camera_to_end_effector[:3, :3] = camera_rotation
+        camera_to_end_effector[:3, 3] = camera_position
+
+        # 末端到基座的齐次变换矩阵
+        end_effector_to_base = np.eye(4)
+        end_effector_to_base[:3, :3] = end_effector_rotation
+        end_effector_to_base[:3, 3] = end_effector_position
+
+        # 转换到基座坐标系
+        target_position_base = end_effector_to_base @ camera_to_end_effector @ target_position_camera
+        return target_position_base[:3]
+
+
+        
     def set_all_joint_angles(self, angles_degrees):
         """
         Sets all joints to the specified angles in degrees.

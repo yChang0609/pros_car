@@ -40,6 +40,10 @@ class DataProcessor:
         )
         return combined_lidar_data
 
+    def get_processed_yolo_detection_position(self):
+        yolo_detection_position_msg = self.ros_communicator.get_latest_yolo_detection_position()
+        return [yolo_detection_position_msg.point.x, yolo_detection_position_msg.point.y, yolo_detection_position_msg.point.z]
+
     def get_processed_received_global_plan(self):
         received_global_plan_msg = self.ros_communicator.get_latest_received_global_plan()
         if received_global_plan_msg is None:

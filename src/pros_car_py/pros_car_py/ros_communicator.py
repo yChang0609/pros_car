@@ -10,7 +10,7 @@ from sensor_msgs.msg import LaserScan
 from trajectory_msgs.msg import JointTrajectoryPoint
 import orjson
 from pros_car_py.ros_communicator_config import ACTION_MAPPINGS
-
+from geometry_msgs.msg import PointStamped
 class RosCommunicator(Node):
     def __init__(self):
         super().__init__("RosCommunicator")
@@ -37,6 +37,12 @@ class RosCommunicator(Node):
         self.latest_received_global_plan = None
         self.subscriber_received_global_plan = self.create_subscription(
             Path, "/received_global_plan", self.received_global_plan_callback, 1
+        )
+
+        # Subscribe to YOLO detected object coordinates
+        self.latest_yolo_coordinates = None
+        self.subscriber_yolo_detection_position = self.create_subscription(
+            PointStamped, "/yolo/detection/position", self.yolo_detection_position_callback, 10
         )
 
         # publish car_C_rear_wheel and car_C_front_wheel
@@ -135,3 +141,15 @@ class RosCommunicator(Node):
         joint_trajectory_point.positions = angle
         joint_trajectory_point.velocities = [0.0] * len(angle)
         self.publisher_joint_trajectory.publish(joint_trajectory_point)
+    
+    # YOLO coordinates callback
+    def yolo_detection_position_callback(self, msg):
+        """Callback to receive YOLO detected object coordinates."""
+        self.latest_yolo_coordinates = msg
+    
+    def get_latest_yolo_detection_position(self):
+        """Getter for the latest YOLO detected object coordinates."""
+        if self.latest_yolo_coordinates is None:
+            self.get_logger().warn("No YOLO coordinates received yet.")
+            return None
+        return self.latest_yolo_coordinates

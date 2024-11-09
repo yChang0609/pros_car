@@ -193,6 +193,8 @@ def init_ros_node():
 
 def main():
     stdscr = curses.initscr()
+    min_required_lines = 7
+    min_required_cols = 20
     ros_communicator, ros_thread = init_ros_node()
     data_processor = DataProcessor(ros_communicator)
     nav2_processing = Nav2Processing(ros_communicator, data_processor)
@@ -205,16 +207,21 @@ def main():
     try:
         while True:
             # stdscr.clear()
-            stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
-            stdscr.addstr(0, 0, "Select a mode:")
-            stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
-            
-            stdscr.addstr(1, 0, "1. Car Control", curses.color_pair(3))
-            stdscr.addstr(2, 0, "2. Arm Control", curses.color_pair(3))
-            stdscr.addstr(3, 0, "3. Auto Nav", curses.color_pair(2))
-            stdscr.addstr(4, 0, "4. Auto Arm Control", curses.color_pair(2))
-            stdscr.addstr(5, 0, "5. Custom Control", curses.color_pair(4))
-            stdscr.addstr(6, 0, "q. Quit", curses.color_pair(4))
+            max_y, max_x = stdscr.getmaxyx()
+            stdscr.clear()
+            if max_y < min_required_lines or max_x < min_required_cols:
+                stdscr.addstr(0, 0, f"Please resize your terminal window to at least {min_required_cols} columns and {min_required_lines} lines.", curses.color_pair(4))
+            else:
+                stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
+                stdscr.addstr(0, 0, "Select a mode:")
+                stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
+                
+                stdscr.addstr(1, 0, "1. Car Control", curses.color_pair(3))
+                stdscr.addstr(2, 0, "2. Arm Control", curses.color_pair(3))
+                stdscr.addstr(3, 0, "3. Auto Nav", curses.color_pair(2))
+                stdscr.addstr(4, 0, "4. Auto Arm Control", curses.color_pair(2))
+                stdscr.addstr(5, 0, "5. Custom Control", curses.color_pair(4))
+                stdscr.addstr(6, 0, "q. Quit", curses.color_pair(4))
             # stdscr.refresh()  # 只在這裡刷新畫面
 
             choice = stdscr.getch()  # 等待使用者輸入

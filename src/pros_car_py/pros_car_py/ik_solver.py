@@ -20,6 +20,7 @@ import random
 import os
 from ament_index_python.packages import get_package_share_directory
 import xml.etree.ElementTree as ET
+import math
 
 class PybulletRobotController:
     def __init__(self, robot_type = 'ur5', initial_height = 0.195, controllable_joints = None, end_eff_index = None, time_step = 1e-3):
@@ -129,8 +130,31 @@ class PybulletRobotController:
                     joint_limits[joint_name] = (lower, upper)
         return joint_limits
 
+    def human_like_wave(self, num_moves=5, steps=30):
+        if len(self.joint_limits) != len(self.controllable_joints):
+            raise ValueError("關節數量與 joint_limits 數量不匹配")
+        
+        angle_sequence = []
+        current_positions = np.array(self.getJointStates()[0])  # 初始角度
+
+        for _ in range(num_moves):
+            # 生成一組新目標角度，使動作更大
+            target_positions = np.array([
+                random.uniform(lower, upper) for lower, upper in self.joint_limits.values()
+            ])
+
+            # 平滑過渡
+            for step in range(steps):
+                t = step / steps
+                intermediate_positions = (1 - t) * current_positions + t * target_positions
+                angle_sequence.append(intermediate_positions.tolist())
+
+            # 更新當前位置
+            current_positions = target_positions
+
+        return angle_sequence
     
-    def random_wave(self, num_moves=5, steps=50):
+    def random_wave(self, num_moves=5, steps=30):  # 減少過渡步數
         # 檢查 joint_limits 長度是否和可控關節數量一致
         if len(self.joint_limits) != len(self.controllable_joints):
             raise ValueError("關節數量與 joint_limits 數量不匹配")
@@ -139,10 +163,12 @@ class PybulletRobotController:
         current_positions = np.array(self.getJointStates()[0])  # 初始關節角度
         
         for _ in range(num_moves):
-            # 生成一組新的目標角度
+            # 生成一組新的目標角度，增加目標範圍的隨機幅度
             target_positions = [
-                random.uniform(lower, upper) for lower, upper in self.joint_limits.values()
+                random.uniform(lower - 0.5 * abs(lower), upper + 0.5 * abs(upper)) 
+                for lower, upper in self.joint_limits.values()
             ]
+            target_positions = np.clip(target_positions, [l for l, _ in self.joint_limits.values()], [u for _, u in self.joint_limits.values()])
             target_positions = np.array(target_positions)
             
             # 確認 target_positions 與 current_positions 的形狀匹配

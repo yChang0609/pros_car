@@ -7,14 +7,14 @@ if [ "$1" = "--port" ] && [ -n "$2" ] && [ -n "$3" ]; then
     shift 3  # Remove the first three arguments
 fi
 
-# gpu check
-if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
-    echo "NVIDIA GPU detected"
-    GPU_FLAGS="--runtime nvidia --gpus all"
-else
-    echo "No NVIDIA GPU detected or NVIDIA drivers not installed"
-    GPU_FLAGS=""
-fi
+# # gpu check
+# if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
+#     echo "NVIDIA GPU detected"
+#     GPU_FLAGS="--runtime nvidia --gpus all"
+# else
+#     echo "No NVIDIA GPU detected or NVIDIA drivers not installed"
+#     GPU_FLAGS=""
+# fi
 
 # 初始化device參數
 device_options=""
@@ -40,7 +40,7 @@ docker run -it --rm \
     --network compose_my_bridge_network \
     --env-file ./.env \
     $PORT_MAPPING \
-    $GPU_FLAGS \
+    --runtime nvidia \
     $device_options \
     ghcr.io/otischung/pros_ai_image_pybullet:latest \
     /bin/bash

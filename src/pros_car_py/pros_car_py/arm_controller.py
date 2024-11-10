@@ -85,15 +85,18 @@ class ArmController():
                 self.ik_solver.setJointPosition(self.joint_pos)
                 yolo_coordinates = self.data_processor.get_processed_yolo_detection_position()
                 camera_position_world, _ = self.ik_solver.get_camera_pose()
+                target_to_camera = np.array(yolo_coordinates) - np.array(camera_position_world)
                 base_position_world, _ = self.ik_solver.get_base_pose()
                 end_effector_position_world = np.array(camera_position_world) - np.array(base_position_world)
                 object_position_world = end_effector_position_world + yolo_coordinates
-                joint_angles_in_degrees = self.ik_solver.moveTowardsTarget(object_position_world)
+                joint_angles_in_degrees = self.ik_solver.solveInversePositionKinematics(object_position_world)
                 self.ros_communicator.publish_coordinates(object_position_world[0], object_position_world[1], object_position_world[2])
-                for i in joint_angles_in_degrees:
-                    joint_angle = self.set_all_joint_angles(i)
-                    # self.update_action(joint_angle)
-                    time.sleep(0.1)
+                joint_angles_in_degrees = [float(angle) for angle in joint_angles_in_degrees]
+                # self.update_action(joint_angles_in_degrees)
+                # for i in joint_angles_in_degrees:
+                #     joint_angle = self.set_all_joint_angles(i)
+                #     self.update_action(joint_angle)
+                #     time.sleep(0.1)
 
                 
                 # 從基座坐標獲取末端位姿

@@ -12,7 +12,6 @@ RIGHT_LIDAR_INDICES = list(range(-45, -15))  # right lidar indices
 class DataProcessor:
     def __init__(self, ros_communicator):
         self.ros_communicator = ros_communicator
-        print(self.ros_communicator.get_latest_lidar())
 
     def get_processed_amcl_pose(self):
         amcl_pose_msg = self.ros_communicator.get_latest_amcl_pose()
@@ -64,7 +63,6 @@ class DataProcessor:
                 ]
             
             # 未获取到检测数据，打印警告并延迟
-            self.get_logger().warning("Failed to receive YOLO detection data. Retrying...")
             time.sleep(0.5)  # 每次尝试间隔 0.5 秒
 
 

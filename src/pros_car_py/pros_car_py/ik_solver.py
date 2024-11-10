@@ -21,6 +21,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 import xml.etree.ElementTree as ET
 import math
+from scipy.spatial.transform import Rotation as R
 
 class PybulletRobotController:
     def __init__(self, robot_type = 'ur5', initial_height = 0.195, controllable_joints = None, end_eff_index = None, time_step = 1e-3):
@@ -54,10 +55,11 @@ class PybulletRobotController:
         p.setPhysicsEngineParameter(fixedTimeStep=self.time_step, numSolverIterations=100, numSubSteps=10)
         p.setRealTimeSimulation(True)
         p.loadURDF("plane.urdf")
+        rotation = R.from_euler('z', 90, degrees=True).as_quat()
 
         #loading robot into the environment
         urdf_file = 'urdf/' + self.robot_type + '.urdf'
-        self.robot_id = p.loadURDF(self.urdf_path, useFixedBase=True, basePosition=[0, 0, self.initial_height])
+        self.robot_id = p.loadURDF(self.urdf_path, useFixedBase=True, basePosition=[0, 0, self.initial_height], baseOrientation=rotation)
 
         self.num_joints = p.getNumJoints(self.robot_id) # Joints
         print('#Joints:',self.num_joints)
@@ -145,22 +147,20 @@ class PybulletRobotController:
         link_state = p.getLinkState(self.robot_id, camera_link_index, computeForwardKinematics=True)
 
         # 提取链接的位置和方向（世界坐标系下）
-        link_world_position = np.array(link_state[4])  # worldLinkFramePosition
-        link_world_orientation = link_state[5]         # worldLinkFrameOrientation (四元数)
-
-        # 将链接的方向转换为旋转矩阵
-        link_rot_matrix = np.array(p.getMatrixFromQuaternion(link_world_orientation)).reshape(3, 3)
+        link_world_position = link_state[4]  # worldLinkFramePosition
+        link_world_orientation = link_state[5]  # worldLinkFrameOrientation (四元数)
 
         # 定义相机在链接坐标系下的偏移（沿着链接的局部 z 轴向上 1 厘米）
-        camera_offset_local = np.array([0, 0, 0.01])  # 单位：米
+        camera_offset_local = [0, 0, 0.01]  # 单位：米
 
-        # 计算相机在世界坐标系下的位置
-        camera_world_position = link_world_position + link_rot_matrix @ camera_offset_local
-
-        # 相机的方向（假设与链接方向相同）
-        camera_world_orientation = link_world_orientation
+        # 使用 PyBullet 的 multiplyTransforms 直接计算相机在世界坐标系下的位置
+        camera_world_position, camera_world_orientation = p.multiplyTransforms(
+            link_world_position, link_world_orientation,  # 基链接位置和方向
+            camera_offset_local, [0, 0, 0, 1]             # 相机相对基链接的偏移和方向
+        )
 
         return camera_world_position, camera_world_orientation
+
     
     def get_base_pose(self):
         """
@@ -175,29 +175,6 @@ class PybulletRobotController:
 
         # 将基座位置转换为 NumPy 数组以便后续处理
         base_position = np.array(base_position)
-
-        # 设置标记的线段长度
-        line_length = 0.1  # 单位：米
-
-        # 在基座位置画一个十字线来表示位置
-        p.addUserDebugLine(
-            [base_position[0] - line_length, base_position[1], base_position[2]],
-            [base_position[0] + line_length, base_position[1], base_position[2]],
-            [1, 0, 0],  # 红色
-            lineWidth=2
-        )
-        p.addUserDebugLine(
-            [base_position[0], base_position[1] - line_length, base_position[2]],
-            [base_position[0], base_position[1] + line_length, base_position[2]],
-            [0, 1, 0],  # 绿色
-            lineWidth=2
-        )
-        p.addUserDebugLine(
-            [base_position[0], base_position[1], base_position[2] - line_length],
-            [base_position[0], base_position[1], base_position[2] + line_length],
-            [0, 0, 1],  # 蓝色
-            lineWidth=2
-        )
 
         # 返回基座位置和方向
         return base_position, base_orientation
@@ -284,13 +261,10 @@ class PybulletRobotController:
         )
     # function to solve forward kinematics
     def solveForwardPositonKinematics(self, joint_pos):
-        print('Forward position kinematics')
-
         # get end-effector link state
         eeState = p.getLinkState(self.robot_id, self.end_eff_index)
         link_trn, link_rot, com_trn, com_rot, frame_pos, frame_rot = eeState
         eePose = list(link_trn) + list(p.getEulerFromQuaternion(link_rot))
-        print('End-effector pose:', eePose)
         return eePose
 
     def moveTowardsTarget(self, target_position, steps=50):

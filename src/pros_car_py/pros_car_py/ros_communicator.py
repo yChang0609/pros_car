@@ -11,6 +11,7 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 import orjson
 from pros_car_py.ros_communicator_config import ACTION_MAPPINGS
 from geometry_msgs.msg import PointStamped
+
 class RosCommunicator(Node):
     def __init__(self):
         super().__init__("RosCommunicator")
@@ -154,8 +155,6 @@ class RosCommunicator(Node):
         coordinate_msg.point.y = y
         coordinate_msg.point.z = z
         self.publisher_coordinates.publish(coordinate_msg)
-        # 可选：记录发布的坐标
-        self.get_logger().info(f"Published coordinates: ({x}, {y}, {z})")
 
     
     # YOLO coordinates callback

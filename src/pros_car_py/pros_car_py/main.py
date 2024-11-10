@@ -121,7 +121,7 @@ class KeyboardController:
 
     def display_mode_info(self):
         """顯示當前模式的信息和控制說明"""
-        self.stdscr.clear()
+        # self.stdscr.clear()
         
         # 顯示當前模式
         self.stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
@@ -200,7 +200,7 @@ def main():
     nav2_processing = Nav2Processing(ros_communicator, data_processor)
     ik_solver = PybulletRobotController(end_eff_index=5)
     car_controller = CarController(ros_communicator, nav2_processing)
-    arm_controller = ArmController(ros_communicator, ik_solver, num_joints=5)
+    arm_controller = ArmController(ros_communicator, data_processor, ik_solver, num_joints=5)
     custom_control = CustomControl(car_controller, arm_controller)
     keyboard_controller = KeyboardController(stdscr, car_controller, arm_controller, custom_control, default_vel=10)
     

@@ -42,6 +42,7 @@ class ArmController():
         self.key = 0
         self.set_all_joint_positions(0.0)
         self.world_created = False
+        self.is_moving = False
         
 
     def manual_control(self, key):
@@ -79,100 +80,63 @@ class ArmController():
             return True
         else:
             if mode == "auto_arm_control":
-                if not self.world_created:
-                    self.ik_solver.createWorld(GUI=False)
-                    self.world_created = True
-                self.ik_solver.setJointPosition(self.joint_pos)
-                yolo_coordinates = self.data_processor.get_processed_yolo_detection_position()
-                camera_position_world, _ = self.ik_solver.get_camera_pose()
-                target_to_camera = np.array(yolo_coordinates) - np.array(camera_position_world)
-                base_position_world, _ = self.ik_solver.get_base_pose()
-                end_effector_position_world = np.array(camera_position_world) - np.array(base_position_world)
-                object_position_world = end_effector_position_world + yolo_coordinates
-                object_position_world[0] = object_position_world[0] - 0.20 # 觀察出來的
-                joint_angles_in_degrees = self.ik_solver.solveInversePositionKinematics(object_position_world)
-                self.ros_communicator.publish_coordinates(object_position_world[0], object_position_world[1], object_position_world[2])
-                joint_angles_in_degrees = [float(angle) for angle in joint_angles_in_degrees]
-                # self.update_action(joint_angles_in_degrees)
-                # for i in joint_angles_in_degrees:
-                #     joint_angle = self.set_all_joint_angles(i)
-                #     self.update_action(joint_angle)
-                #     time.sleep(0.1)
-
-                
-                # 從基座坐標獲取末端位姿
-                # end_effector_position, end_effector_orientation, _ = self.ik_solver.get_end_effector_state()
-                # end_effector_rotation = R.from_quat(end_effector_orientation).as_matrix()
-
-                # 計算 YOLO 偵測到的目標在基座坐標系中的位置
-                # target_position_base = self.transform_camera_to_base(
-                #     camera_position,
-                #     camera_rotation,
-                #     end_effector_position,
-                #     end_effector_rotation,
-                #     yolo_coordinates
-                # )
+                try:
+                    if not self.world_created:
+                        self.ik_solver.createWorld(GUI=False)
+                        self.world_created = True
+                    self.ik_solver.setJointPosition(self.joint_pos)
+                    
+                    object_position_world = self.process_yolo_coordinates()
+                    self.ros_communicator.publish_coordinates(object_position_world[0], object_position_world[1], object_position_world[2])
+                    # self.move_to_position(object_position_world)
+                    self.gradual_move(object_position_world)
+                    # self.human_like_wave(num_moves=1, steps=10)
+                except Exception as e:
+                    print(f"Error in auto_control: {e}")
+    
+    def move_to_position(self, object_position_world):
+        joint_angles = self.ik_solver.solveInversePositionKinematics(object_position_world)
+        # joint_angles = joint_angles[:-1]
+        # self.set_all_joint_angles(joint_angles)
+        # self.update_action(self.joint_angles)
 
 
-                
-                # # 只取得關節角度
-                # joint_angle = self.ik_solver.solveInversePositionKinematics(target_position)
-                # self.update_action(joint_angle)
-
-                # print("Press Enter to continue...")
-                # sys.stdin.read(1)  # 读取一个字符，Enter 键
-                # print("Continuing...")
-                # self.ik_solver.stop_simulation()
-                # return True
-                # 取得漸進角度
-
-                
-                # self.ik_solver.stop_simulation()
-                # return True
-
-                # 隨機波動
-                # joint_angle_sequences = self.ik_solver.human_like_wave(num_moves=5, steps=20)  # 獲取隨機波動角度序列
-                # for joint_angles in joint_angle_sequences:
-                #     joint_angles[-1] = math.radians(10)
-                #     self.ik_solver.setJointPosition(joint_angles)
-                #     joint_angle = self.set_all_joint_angles(joint_angles)
-                #     self.update_action(joint_angle)
-                #     time.sleep(0.01)
+    def gradual_move(self, object_position_world):
+        joint_angles_sequence = self.ik_solver.moveTowardsTarget(object_position_world, steps=5)
+        for joint_angles in joint_angles_sequence:
+            self.ik_solver.setJointPosition(joint_angles)
+            joint_angle = self.set_all_joint_angles(joint_angles)
+            self.update_action(joint_angle)
+            time.sleep(0.3)
 
 
-    def transform_camera_to_base(self, camera_position, camera_rotation, end_effector_position, end_effector_rotation, yolo_coordinates):
-        # 定义从相机坐标系到PyBullet坐标系的旋转矩阵
-        coordinate_transform = np.array([
-            [0, 0, 1],
-            [1, 0, 0],
-            [0, -1, 0]
-        ])
-        
-        # 将YOLO的坐标转换为PyBullet坐标系
-        yolo_coords = np.array([yolo_coordinates[0], yolo_coordinates[1], yolo_coordinates[2]])
-        pybullet_coords = coordinate_transform @ yolo_coords
-        
-        # 将转换后的坐标扩展为齐次坐标
-        target_position_camera = np.array([pybullet_coords[0], pybullet_coords[1], pybullet_coords[2], 1])
-        
-        # 更新相机到末端的旋转矩阵
-        camera_rotation = coordinate_transform @ camera_rotation
 
-        # 相机到末端的齐次变换矩阵
-        camera_to_end_effector = np.eye(4)
-        camera_to_end_effector[:3, :3] = camera_rotation
-        camera_to_end_effector[:3, 3] = camera_position
+    def random_wave(self, num_moves=5, steps=30):
+        joint_angle_sequences = self.ik_solver.random_wave(num_moves=num_moves, steps=steps)
+        for joint_angles in joint_angle_sequences:
+            self.ik_solver.setJointPosition(joint_angles)
+            joint_angle = self.set_all_joint_angles(joint_angles)
+            self.update_action(joint_angle)
+            time.sleep(0.01)
 
-        # 末端到基座的齐次变换矩阵
-        end_effector_to_base = np.eye(4)
-        end_effector_to_base[:3, :3] = end_effector_rotation
-        end_effector_to_base[:3, 3] = end_effector_position
+    def human_like_wave(self, num_moves=5, steps=30):
+        joint_angle_sequences = self.ik_solver.human_like_wave(num_moves=num_moves, steps=steps)
+        for joint_angles in joint_angle_sequences:
+            self.ik_solver.setJointPosition(joint_angles)
+            joint_angle = self.set_all_joint_angles(joint_angles)
+            self.update_action(joint_angle)
+            time.sleep(0.01)
 
-        # 转换到基座坐标系
-        target_position_base = end_effector_to_base @ camera_to_end_effector @ target_position_camera
-        return target_position_base[:3]
-
-
+    def process_yolo_coordinates(self):
+        # 將 yolo 得到的座標放進 pybullet 處理
+        yolo_coordinates = self.data_processor.get_processed_yolo_detection_position()
+        camera_position_world, _ = self.ik_solver.get_camera_pose()
+        target_to_camera = np.array(yolo_coordinates) - np.array(camera_position_world)
+        base_position_world, _ = self.ik_solver.get_base_pose()
+        end_effector_position_world = np.array(camera_position_world) - np.array(base_position_world)
+        object_position_world = end_effector_position_world + yolo_coordinates
+        object_position_world[0] = object_position_world[0] - 0.20 # 觀察出來的
+        return object_position_world
         
     def set_all_joint_angles(self, angles_degrees):
         """

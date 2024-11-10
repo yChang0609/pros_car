@@ -133,47 +133,31 @@ class PybulletRobotController:
         return joint_limits
     
     def get_camera_pose(self):
-        """
-        获取深度相机在机器人基座坐标系下的位置和方向。
-
-        Returns:
-            camera_position (np.array): 相机的位置 [x, y, z]，单位为米。
-            camera_orientation (tuple): 相机的方向，以四元数表示 (x, y, z, w)。
-        """
-        # 假设相机安装在倒数第二个关节（self.end_eff_index - 1）上
+        # 加設深度相機裝在倒數第二關節
         camera_link_index = self.end_eff_index - 1
 
-        # 获取链接的状态
         link_state = p.getLinkState(self.robot_id, camera_link_index, computeForwardKinematics=True)
 
-        # 提取链接的位置和方向（世界坐标系下）
+        # 抓世界座標
         link_world_position = link_state[4]  # worldLinkFramePosition
-        link_world_orientation = link_state[5]  # worldLinkFrameOrientation (四元数)
+        link_world_orientation = link_state[5]
 
-        # 定义相机在链接坐标系下的偏移（沿着链接的局部 z 轴向上 1 厘米）
-        camera_offset_local = [0, 0, 0.01]  # 单位：米
+        # 定義相機在倒數第二關節的偏移
+        camera_offset_local = [0, 0, 0.01]  # 公尺
 
-        # 使用 PyBullet 的 multiplyTransforms 直接计算相机在世界坐标系下的位置
+        # 計算世界座標
         camera_world_position, camera_world_orientation = p.multiplyTransforms(
-            link_world_position, link_world_orientation,  # 基链接位置和方向
-            camera_offset_local, [0, 0, 0, 1]             # 相机相对基链接的偏移和方向
+            link_world_position, link_world_orientation,
+            camera_offset_local, [0, 0, 0, 1]
         )
 
         return camera_world_position, camera_world_orientation
 
     
     def get_base_pose(self):
-        """
-        获取机器人基座（base_link）的世界坐标系位置和方向，并在基座位置画一个标记。
-
-        Returns:
-            base_position (np.array): 基座的位置 [x, y, z]，单位为米。
-            base_orientation (tuple): 基座的方向，以四元数表示 (x, y, z, w)。
-        """
-        # 使用 pybullet API 获取基座的位姿
+        # 抓基座世界座標
         base_position, base_orientation = p.getBasePositionAndOrientation(self.robot_id)
 
-        # 将基座位置转换为 NumPy 数组以便后续处理
         base_position = np.array(base_position)
 
         # 返回基座位置和方向

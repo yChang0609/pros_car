@@ -111,7 +111,7 @@ class KeyboardController:
         """更新顯示內容"""
         self.stdscr.clear()
         self.display_mode_info()
-        self.stdscr.refresh()
+        # self.stdscr.refresh()
 
     def _reset_mode(self):
         """重置模式相關的狀態"""
@@ -162,7 +162,7 @@ class KeyboardController:
         if self.last_key:
             self.stdscr.addstr(6, 0, f"Last key pressed: {self.last_key}")
         
-        self.stdscr.refresh()
+        # self.stdscr.refresh()
 
     def handle_key_input(self, c):
         """處理鍵盤輸入"""
@@ -208,7 +208,6 @@ def main():
         while True:
             # stdscr.clear()
             max_y, max_x = stdscr.getmaxyx()
-            stdscr.clear()
             if max_y < min_required_lines or max_x < min_required_cols:
                 stdscr.addstr(0, 0, f"Please resize your terminal window to at least {min_required_cols} columns and {min_required_lines} lines.", curses.color_pair(4))
             else:

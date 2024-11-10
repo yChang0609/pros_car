@@ -131,7 +131,45 @@ class PybulletRobotController:
                     upper = float(limit.get("upper", 3.14159))   # 預設為 180 度
                     joint_limits[joint_name] = (lower, upper)
         return joint_limits
-    
+
+    def get_current_pose(self, link_index=None):
+        """
+        根據指定的手臂關節角度來獲取特定連結的世界座標和旋轉矩陣。
+
+        Args:
+            link_index (int, optional): 連結索引。默認為倒數第一個連結（即末端執行器）。
+
+        Returns:
+            position (np.array): 指定連結的世界坐標 [x, y, z]。
+            rotation_matrix (np.array): 指定連結的旋轉矩陣 (3x3)。
+        """
+        # 獲取機器人的總連結數
+        num_links = p.getNumJoints(self.robot_id)
+
+        # 處理負索引，使其轉換為對應的正索引
+        if link_index is None:
+            link_index = self.end_eff_index  # 默認為末端執行器
+        elif link_index < 0:
+            link_index = num_links + link_index  # 將負索引轉換為正索引
+
+        # 驗證link_index是否合法
+        if link_index < 0 or link_index >= num_links:
+            raise ValueError(f"Invalid link_index {link_index}. Valid range is 0 to {num_links - 1}.")
+
+        # 獲取指定連結的鏈接狀態
+        link_state = p.getLinkState(self.robot_id, link_index, computeForwardKinematics=True)
+
+        # 取得指定連結在世界座標系中的位置和方向（四元數）
+        link_position = np.array(link_state[4])  # worldLinkFramePosition
+        link_orientation = link_state[5]  # worldLinkFrameOrientation (四元數)
+
+        # 將四元數轉換為旋轉矩陣
+        rotation_matrix = np.array(p.getMatrixFromQuaternion(link_orientation)).reshape(3, 3)
+
+        return link_position, rotation_matrix
+
+
+
     def get_camera_pose(self):
         # 加設深度相機裝在倒數第二關節
         camera_link_index = self.end_eff_index - 1
@@ -250,6 +288,21 @@ class PybulletRobotController:
         link_trn, link_rot, com_trn, com_rot, frame_pos, frame_rot = eeState
         eePose = list(link_trn) + list(p.getEulerFromQuaternion(link_rot))
         return eePose
+
+    def format_joint_angles(joint_angles, precision=3):
+        """
+        將列表中的所有角度轉換為 float，並保留小數點後指定位數。
+
+        Args:
+            joint_angles (list): 原始的關節角度列表。
+            precision (int): 保留的小數位數 (預設為 3)。
+
+        Returns:
+            list: 格式化後的關節角度列表。
+        """
+        return [round(float(angle), precision) for angle in joint_angles]
+
+
 
     def moveTowardsTarget(self, target_position, steps=50):
         # 獲取當前末端執行器的位置

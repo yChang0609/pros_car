@@ -57,6 +57,10 @@ class RosCommunicator(Node):
             JointTrajectoryPoint, DeviceDataTypeEnum.robot_arm, 10
         )
 
+        self.publisher_coordinates = self.create_publisher(
+            PointStamped, "/coordinates", 10
+        )
+
     # amcl_pose callback and get_latest_amcl_pose
     def subscriber_amcl_callback(self, msg):
         self.latest_amcl_pose = msg
@@ -141,6 +145,18 @@ class RosCommunicator(Node):
         joint_trajectory_point.positions = angle
         joint_trajectory_point.velocities = [0.0] * len(angle)
         self.publisher_joint_trajectory.publish(joint_trajectory_point)
+    
+    def publish_coordinates(self, x, y, z, frame_id="map"):
+        coordinate_msg = PointStamped()
+        coordinate_msg.header.stamp = self.get_clock().now().to_msg()
+        coordinate_msg.header.frame_id = frame_id
+        coordinate_msg.point.x = x
+        coordinate_msg.point.y = y
+        coordinate_msg.point.z = z
+        self.publisher_coordinates.publish(coordinate_msg)
+        # 可选：记录发布的坐标
+        self.get_logger().info(f"Published coordinates: ({x}, {y}, {z})")
+
     
     # YOLO coordinates callback
     def yolo_detection_position_callback(self, msg):

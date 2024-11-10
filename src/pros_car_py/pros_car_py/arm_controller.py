@@ -6,6 +6,7 @@ import numpy as np
 import time
 import sys
 from scipy.spatial.transform import Rotation as R
+import pybullet as p
 
 class ArmController():
     """
@@ -79,16 +80,21 @@ class ArmController():
         else:
             if mode == "auto_arm_control":
                 if not self.world_created:
-                    self.ik_solver.createWorld(GUI=True)
+                    self.ik_solver.createWorld(GUI=False)
                     self.world_created = True
-                self.ik_solver.setJointPosition([1.57, 1.57, 1.57, 1.57, 1.57])
-                self.ik_solver.markDepthCameraPosition(offset=0.01)
-                target_position_base = [0.1,0.1,0.1]
-                # yolo_coordinates = self.data_processor.get_processed_yolo_detection_position()
+                self.ik_solver.setJointPosition(self.joint_pos)
+                yolo_coordinates = self.data_processor.get_processed_yolo_detection_position()
+                camera_position_world, _ = self.ik_solver.get_camera_pose()
+                base_position_world, _ = self.ik_solver.get_base_pose()
+                end_effector_position_world = np.array(camera_position_world) - np.array(base_position_world)
+                object_position_world = end_effector_position_world + yolo_coordinates
+                joint_angles_in_degrees = self.ik_solver.moveTowardsTarget(object_position_world)
+                self.ros_communicator.publish_coordinates(object_position_world[0], object_position_world[1], object_position_world[2])
+                for i in joint_angles_in_degrees:
+                    joint_angle = self.set_all_joint_angles(i)
+                    # self.update_action(joint_angle)
+                    time.sleep(0.1)
 
-                 # 假設相機與末端執行器之間的相對位姿
-                camera_position = [0, 0, 0.1]  # 相機在末端的 10cm 上方
-                camera_rotation = R.from_euler('xyz', [0, 0, 0]).as_matrix()
                 
                 # 從基座坐標獲取末端位姿
                 # end_effector_position, end_effector_orientation, _ = self.ik_solver.get_end_effector_state()
@@ -116,11 +122,7 @@ class ArmController():
                 # return True
                 # 取得漸進角度
 
-                # joint_angles_in_degrees = self.ik_solver.moveTowardsTarget(target_position_base)
-                # for i in joint_angles_in_degrees:
-                #     joint_angle = self.set_all_joint_angles(i)
-                #     self.update_action(joint_angle)
-                #     time.sleep(0.1)
+                
                 # self.ik_solver.stop_simulation()
                 # return True
 

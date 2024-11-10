@@ -129,6 +129,81 @@ class PybulletRobotController:
                     upper = float(limit.get("upper", 3.14159))   # 預設為 180 度
                     joint_limits[joint_name] = (lower, upper)
         return joint_limits
+    
+    def get_camera_pose(self):
+        """
+        获取深度相机在机器人基座坐标系下的位置和方向。
+
+        Returns:
+            camera_position (np.array): 相机的位置 [x, y, z]，单位为米。
+            camera_orientation (tuple): 相机的方向，以四元数表示 (x, y, z, w)。
+        """
+        # 假设相机安装在倒数第二个关节（self.end_eff_index - 1）上
+        camera_link_index = self.end_eff_index - 1
+
+        # 获取链接的状态
+        link_state = p.getLinkState(self.robot_id, camera_link_index, computeForwardKinematics=True)
+
+        # 提取链接的位置和方向（世界坐标系下）
+        link_world_position = np.array(link_state[4])  # worldLinkFramePosition
+        link_world_orientation = link_state[5]         # worldLinkFrameOrientation (四元数)
+
+        # 将链接的方向转换为旋转矩阵
+        link_rot_matrix = np.array(p.getMatrixFromQuaternion(link_world_orientation)).reshape(3, 3)
+
+        # 定义相机在链接坐标系下的偏移（沿着链接的局部 z 轴向上 1 厘米）
+        camera_offset_local = np.array([0, 0, 0.01])  # 单位：米
+
+        # 计算相机在世界坐标系下的位置
+        camera_world_position = link_world_position + link_rot_matrix @ camera_offset_local
+
+        # 相机的方向（假设与链接方向相同）
+        camera_world_orientation = link_world_orientation
+
+        return camera_world_position, camera_world_orientation
+    
+    def get_base_pose(self):
+        """
+        获取机器人基座（base_link）的世界坐标系位置和方向，并在基座位置画一个标记。
+
+        Returns:
+            base_position (np.array): 基座的位置 [x, y, z]，单位为米。
+            base_orientation (tuple): 基座的方向，以四元数表示 (x, y, z, w)。
+        """
+        # 使用 pybullet API 获取基座的位姿
+        base_position, base_orientation = p.getBasePositionAndOrientation(self.robot_id)
+
+        # 将基座位置转换为 NumPy 数组以便后续处理
+        base_position = np.array(base_position)
+
+        # 设置标记的线段长度
+        line_length = 0.1  # 单位：米
+
+        # 在基座位置画一个十字线来表示位置
+        p.addUserDebugLine(
+            [base_position[0] - line_length, base_position[1], base_position[2]],
+            [base_position[0] + line_length, base_position[1], base_position[2]],
+            [1, 0, 0],  # 红色
+            lineWidth=2
+        )
+        p.addUserDebugLine(
+            [base_position[0], base_position[1] - line_length, base_position[2]],
+            [base_position[0], base_position[1] + line_length, base_position[2]],
+            [0, 1, 0],  # 绿色
+            lineWidth=2
+        )
+        p.addUserDebugLine(
+            [base_position[0], base_position[1], base_position[2] - line_length],
+            [base_position[0], base_position[1], base_position[2] + line_length],
+            [0, 0, 1],  # 蓝色
+            lineWidth=2
+        )
+
+        # 返回基座位置和方向
+        return base_position, base_orientation
+
+
+
 
     def human_like_wave(self, num_moves=5, steps=30):
         if len(self.joint_limits) != len(self.controllable_joints):

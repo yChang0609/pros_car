@@ -1,5 +1,7 @@
 # from geometry_msgs.msg impor
 import math
+import time
+
 # LiDAR global constants
 LIDAR_RANGE = 90
 LIDAR_PER_SECTOR = 20
@@ -40,9 +42,31 @@ class DataProcessor:
         )
         return combined_lidar_data
 
+    import time
+
     def get_processed_yolo_detection_position(self):
-        yolo_detection_position_msg = self.ros_communicator.get_latest_yolo_detection_position()
-        return [yolo_detection_position_msg.point.x, yolo_detection_position_msg.point.y, yolo_detection_position_msg.point.z]
+        """
+        不断尝试获取经过处理的 YOLO 检测到的目标位置，直到成功。
+
+        Returns:
+            list: 包含 [x, y, z] 的目标位置坐标列表。
+                如果无法接收数据，则会持续尝试。
+        """
+        while True:
+            yolo_detection_position_msg = self.ros_communicator.get_latest_yolo_detection_position()
+
+            if yolo_detection_position_msg is not None:
+                # 成功获取到检测数据
+                return [
+                    yolo_detection_position_msg.point.x,
+                    yolo_detection_position_msg.point.y,
+                    yolo_detection_position_msg.point.z
+                ]
+            
+            # 未获取到检测数据，打印警告并延迟
+            self.get_logger().warning("Failed to receive YOLO detection data. Retrying...")
+            time.sleep(0.5)  # 每次尝试间隔 0.5 秒
+
 
     def get_processed_received_global_plan(self):
         received_global_plan_msg = self.ros_communicator.get_latest_received_global_plan()

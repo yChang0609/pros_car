@@ -7,6 +7,7 @@ import time
 import sys
 from scipy.spatial.transform import Rotation as R
 import pybullet as p
+import numpy as np
 
 class ArmController():
     """
@@ -34,9 +35,13 @@ class ArmController():
     """
 
     def __init__(self, ros_communicator, data_processor, ik_solver, num_joints = 4):
+        # initail pybullet
+        self.ik_solver = ik_solver
+        self.ik_solver.createWorld(GUI=False)
+
         self.ros_communicator = ros_communicator
         self.data_processor = data_processor
-        self.ik_solver = ik_solver
+        
         self.num_joints = num_joints
         self.joint_pos = []
         self.key = 0
@@ -47,6 +52,10 @@ class ArmController():
         self.is_moving = False
         self.action_in_progress = False  # 動作進行中的標誌
 
+        self.x = 0
+        self.y = 0
+
+        
         
 
     def manual_control(self, key):
@@ -75,64 +84,146 @@ class ArmController():
         elif key == 'q':
             return True
 
-        if not self.world_created:
-            self.ik_solver.createWorld(GUI=False)
-        self.world_created = True
         try:
             object_position_world = self.project_yolo_to_world()
             self.ros_communicator.publish_coordinates(object_position_world[0], object_position_world[1], object_position_world[2])
-            self.ik_solver.setJointPosition(self.joint_pos)
         except:
             pass
+        # self.ik_solver.setJointPosition(joint_angles)
+
         self.update_action(self.joint_pos)
-        
+    
+    # auto control--------------------------------------------------
     def auto_control(self, key=None, mode="auto_arm_control"):
         if key == "q":
-            self.reset_arm(all_angle_degrees = 90.0)
-            self.update_action(self.joint_pos)
+            # self.reset_arm(all_angle_degrees = 90.0)
+            # self.update_action(self.joint_pos)
             # self.ik_solver.stop_simulation()
             self.action_in_progress = False
             return True
         else:
-            if mode == "auto_arm_control":
-                try:
-                    if not self.world_created:
-                        self.ik_solver.createWorld(GUI=False)
-                        self.world_created = True
-                    self.ik_solver.setJointPosition(self.joint_pos)
-                    
-                    # object_position_world = self.process_yolo_coordinates()
-                    # object_position_world = self.project_yolo_to_world()
-                    object_position_world = self.project_yolo_to_world_fixed_depth()
-                    self.ros_communicator.publish_coordinates(object_position_world[0], object_position_world[1], object_position_world[2])
-                    # self.move_to_position(object_position_world)
-                    self.gradual_move(object_position_world)
-                    # self.human_like_wave(num_moves=1, steps=10)
-                except Exception as e:
-                    print(f"Error in auto_control: {e}")
+            try:
+                if mode == "auto_arm_control":
+                    # coordinate = self.get_forward_position(offset_distance=0.3)
+                    # self.move_to_position(coordinate)
+                    self.align_to_target_with_yolo_offset()
+                    # world_created_position = self.project_yolo_to_world()
+                    # self.publish_coordinates(world_created_position[0], world_created_position[1], world_created_position[2])
+                    # self.gradual_move(world_created_position)
+                elif mode == "human_like_wave":
+                    self.human_like_wave(num_moves=1, steps=10)
+            except Exception as e:
+                print(f"Error in auto_control: {e}")
     
-    def move_to_position(self, object_position_world):
-        joint_angles = self.ik_solver.solveInversePositionKinematics(object_position_world)
-        # joint_angles = joint_angles[:-1]
-        # self.set_all_joint_angles(joint_angles)
-        # self.update_action(self.joint_angles)
+    def publish_coordinates(self, x, y, z):
+        self.ros_communicator.publish_coordinates(x, y, z)
 
+    def move_to_position(self, object_position_world):
+        self.action_in_progress = True
+        joint_angles = self.ik_solver.solveInversePositionKinematics(object_position_world)
+        joint_angles = joint_angles[:-1]
+        self.ik_solver.setJointPosition(joint_angles)
+          # 將 joint_angles 賦值給 self.joint_pos
+        self.update_action(joint_angles)  # 更新動作
+        time.sleep(5.0)
+        self.action_in_progress = False
+
+    
+    def align_to_target_with_yolo_offset(self, step_size=0.05, tolerance=0.03):
+        """
+        根據 YOLO 偵測到的偏移量，逐步調整機械手臂的末端位置，使其對準目標物體的中心。
+
+        Args:
+            step_size (float): 每次移動的增量距離，默認為 0.05 米。
+            tolerance (float): 允許的偏移量容忍範圍，默認為 0.03 米。
+        """
+        # 獲取物體在相機畫面中的偏移量
+        x_offset, y_offset, _ = self.data_processor.get_processed_yolo_detection_offset()
+
+        # 檢查偏移量是否已經在允許的容忍範圍內
+        if abs(x_offset) <= tolerance and abs(y_offset) <= tolerance:
+            print("已對準，停止校正")
+            return True
+
+        # 獲取末端執行器的當前旋轉矩陣
+        _, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
+
+        # 根據畫面座標系將 x_offset, y_offset 轉換到夾具的本地座標系
+        # x_offset 對應夾具的 Y 軸移動方向，y_offset 對應夾具的 Z 軸移動方向
+        move_vector = end_effector_rotation_matrix @ np.array([0, -x_offset, y_offset])
+
+        # 將移動向量歸一化並乘以 step_size 以控制移動步長
+        move_vector = move_vector / np.linalg.norm(move_vector) * step_size
+
+        # 移動機械手臂的末端執行器
+        self.move_end_effector(x_offset=move_vector[0], y_offset=move_vector[1], z_offset=move_vector[2])
+
+        print("最終對準完成")
+
+    
+    def move_end_effector(self, x_offset=0.0, y_offset=0.0, z_offset=0.0):
+        """
+        移動機械手臂的末端執行器，基於指定的 x、y、z 偏移量進行移動。
+        
+        Args:
+            x_offset (float): 沿著 x 軸的移動距離（單位：米）。
+            y_offset (float): 沿著 y 軸的移動距離（單位：米）。
+            z_offset (float): 沿著 z 軸的移動距離（單位：米）。
+        """
+        # 獲取末端執行器的當前位置和旋轉矩陣
+        end_effector_position_world, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
+
+        # 計算目標位置，將偏移量加到當前位置
+        target_position_world = np.array(end_effector_position_world) + np.array([x_offset, y_offset, z_offset])
+
+        # 使用 IK 移動到新的目標位置
+        self.move_to_position(target_position_world)
+
+        # 發佈新的目標位置
+        self.ros_communicator.publish_coordinates(
+            target_position_world[0],
+            target_position_world[1],
+            target_position_world[2]
+        )
+
+        print(f"移動到新位置: x={target_position_world[0]:.4f}, y={target_position_world[1]:.4f}, z={target_position_world[2]:.4f}")
+
+
+
+    def get_forward_position(self, offset_distance=0.05):
+        """
+        根據當前末端執行器的方向，計算指定距離前方的目標座標。
+
+        Args:
+            offset_distance (float): 偏移距離（單位：米），指定末端執行器正前方的距離，預設為 0.01 米。
+
+        Returns:
+            np.array: 目標位置的世界座標。
+        """
+        # 獲取末端執行器的當前位置和旋轉矩陣
+        end_effector_position_world, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
+
+        # 獲取末端執行器當前的 X 軸方向向量，表示正前方
+        forward_direction = end_effector_rotation_matrix @ np.array([1, 0, 0])
+
+        # 計算正前方的目標位置
+        target_position_world = np.array(end_effector_position_world) + forward_direction * offset_distance
+
+        return target_position_world
 
     def gradual_move(self, object_position_world):
         self.action_in_progress = True
         joint_angles_sequence = self.ik_solver.moveTowardsTarget(object_position_world, steps=5)
-        joint_angles_sequence = joint_angles_sequence[:1]
+        joint_angles_sequence = joint_angles_sequence[:-1]
         for joint_angles in joint_angles_sequence:
             depth = self.data_processor.get_processed_yolo_detection_position()[0]
             print(depth)
-            # if depth < 0.3:
-            #     return True
-            #     self.action_in_progress = False
-            #     break
-            self.ik_solver.setJointPosition(joint_angles)
-            joint_angle = self.set_all_joint_angles(joint_angles)
-            self.update_action(joint_angle)
-            time.sleep(0.2)
+            if depth < 0.35:
+                self.action_in_progress = False
+                break
+            self.set_all_joint_angles(joint_angles)
+            self.update_action(self.joint_pos)
+            time.sleep(0.5)
         self.action_in_progress = False
 
 
@@ -141,7 +232,7 @@ class ArmController():
         joint_angle_sequences = self.ik_solver.random_wave(num_moves=num_moves, steps=steps)
         for joint_angles in joint_angle_sequences:
             self.ik_solver.setJointPosition(joint_angles)
-            joint_angle = self.set_all_joint_angles(joint_angles)
+            self.set_all_joint_angles(joint_angles)
             self.update_action(joint_angle)
             time.sleep(0.01)
 
@@ -149,11 +240,10 @@ class ArmController():
         joint_angle_sequences = self.ik_solver.human_like_wave(num_moves=num_moves, steps=steps)
         for joint_angles in joint_angle_sequences:
             self.ik_solver.setJointPosition(joint_angles)
-            joint_angle = self.set_all_joint_angles(joint_angles)
-            self.update_action(joint_angle)
+            self.set_all_joint_angles(joint_angles)
+            self.update_action(self.joint_pos)
             time.sleep(0.01)
 
-    import numpy as np
 
     def process_yolo_coordinates(self):
         yolo_coordinates = self.data_processor.get_processed_yolo_detection_position()
@@ -204,36 +294,242 @@ class ArmController():
         # 將物體從相機坐標系轉換到世界坐標系
         object_position_world = np.array(end_effector_position_world) + end_effector_rotation_matrix @ object_position_camera
         return object_position_world
+    
+    def project_yolo_to_world_offset(self, offset_distance=0.3, tolerance=0.03, max_iterations=50):
+        """
+        將 YOLO 偵測到的物體座標投射到 PyBullet 世界坐標系中的末端執行器前方，
+        並讓十字中心對準物體，保持距離物體30公分。
+
+        Args:
+            offset_distance (float): 指定機械手臂與物體的距離（單位：米），預設為 0.3 米。
+            tolerance (float): x 和 y 軸的容忍範圍，預設為 0.03 米。
+            max_iterations (int): 最大迭代次數，以防止無限循環。
+
+        Returns:
+            np.array: 最終的世界坐標位置。
+        """
+        for _ in range(max_iterations):
+            # 獲取 YOLO 偵測到的物體在相機坐標系中的位置偏移
+            yolo_offset = self.data_processor.get_processed_yolo_detection_position()
+            x_offset, y_offset, depth_value = yolo_offset[0], yolo_offset[1], yolo_offset[2]
+
+            # 檢查是否已經在容忍範圍內
+            if abs(x_offset) <= tolerance and abs(y_offset) <= tolerance:
+                print("已對準，停止校正")
+                break
+
+            # 計算物體在相機坐標系下的目標位置，保持 offset_distance 的 Z 軸距離
+            target_position_camera = np.array([offset_distance, x_offset, y_offset])
+
+            # 獲取末端執行器的世界位置和旋轉矩陣
+            end_effector_position_world, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
+
+            # 將相機坐標系下的目標位置轉換為世界坐標系
+            target_position_world = np.array(end_effector_position_world) + end_effector_rotation_matrix @ target_position_camera
+
+            # 使用 IK 將末端執行器移動到新的目標位置
+            self.move_to_position(target_position_world)
+
+            # 發佈新的目標位置
+            self.ros_communicator.publish_coordinates(
+                target_position_world[0],
+                target_position_world[1],
+                target_position_world[2]
+            )
+
+            # 小延遲以便系統完成移動
+            time.sleep(0.1)
+
+        return target_position_world
+
+
+    def project_yolo_to_target(self, step_size=0.05, target_distance=0.3, tolerance=0.02):
+        """
+        將 YOLO 偵測的座標投射到距離機械手末端指定距離處，並確保與物體座標向量方向一致，使用線性插值逐步移動。
+
+        Args:
+            step_size (float): 每次移動的增量距離，默認為 0.05 米。
+            target_distance (float): 目標距離（距離物體的距離），默認為 0.3 米。
+            tolerance (float): 允許的最小距離差，用於檢查深度是否接近目標距離，默認為 0.02 米。
+
+        Returns:
+            None
+        """
+        # 獲取 YOLO 偵測到的物體在相機坐標系中的位置
+        object_position_world = self.project_yolo_to_world()
+
+        # 計算從末端到物體位置的向量
+        end_effector_position_world, _ = self.ik_solver.get_current_pose()
+        direction_vector = object_position_world - end_effector_position_world
+        current_distance = np.linalg.norm(direction_vector)
+        normalized_direction_vector = direction_vector / current_distance
+
+        # 計算目標位置，讓末端保持距離物體 target_distance
+        target_position_world = object_position_world - normalized_direction_vector * target_distance
+
+        while current_distance > target_distance + tolerance:
+            # 每次移動 step_size 距離，逐步接近目標
+            incremental_position = end_effector_position_world + normalized_direction_vector * step_size
+            self.move_to_position(incremental_position)
+            
+            # 更新當前位置與距離
+            end_effector_position_world, _ = self.ik_solver.get_current_pose()
+            direction_vector = object_position_world - end_effector_position_world
+            current_distance = np.linalg.norm(direction_vector)
+
+            # 發佈當前位置
+            self.ros_communicator.publish_coordinates(
+                end_effector_position_world[0],
+                end_effector_position_world[1],
+                end_effector_position_world[2]
+            )
+
+            # 檢查是否已達到允許範圍內的距離
+            if abs(current_distance - target_distance) <= tolerance:
+                print("已達到目標距離範圍內")
+                break
+
+            # 短暫延遲以允許手臂移動完成
+            time.sleep(0.01)
+        
+    
+
+    def project_yolo_to_world_look_at_target(self, offset_distance=0.1):
+        
+        # 獲取 YOLO 偵測到的物體偏移座標
+        yolo_coordinates = np.array(self.data_processor.get_processed_yolo_detection_position())
+        if len(yolo_coordinates) == 2:
+            yolo_coordinates = np.append(yolo_coordinates, 0)  # 添加預設 z 值
+
+        # 計算目標物體在相機坐標系下的位置
+        target_position_camera = np.array(yolo_coordinates) + np.array([0, 0, offset_distance])
+
+        # 獲取末端執行器的世界位置和旋轉矩陣
+        end_effector_position_world, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
+
+        # 將相機座標系下的目標位置轉換到世界坐標系
+        target_position_world = np.array(end_effector_position_world) + end_effector_rotation_matrix @ target_position_camera
+
+        # 計算「相機注視物體」所需的旋轉
+        direction_to_target = target_position_world - end_effector_position_world
+        direction_to_target /= np.linalg.norm(direction_to_target)  # 歸一化方向向量
+
+        # 確保 z 軸對準目標方向
+        z_axis_world = direction_to_target  # 末端執行器 z 軸對準目標
+        x_axis_world = np.array([1, 0, 0])  # 假設 x 軸水平對齊
+        y_axis_world = np.cross(z_axis_world, x_axis_world)  # 計算 y 軸
+        x_axis_world = np.cross(y_axis_world, z_axis_world)  # 重計算 x 軸使其正交
+
+        # 建立旋轉矩陣並轉換為四元數
+        rotation_matrix = np.vstack([x_axis_world, y_axis_world, z_axis_world]).T
+        target_orientation_quaternion = R.from_matrix(rotation_matrix).as_quat()
+
+        # 使用逆運動學計算末端執行器的位置和朝向
+        end_eff_pose = list(target_position_world) + list(target_orientation_quaternion)
+        self.move_to_position(end_eff_pose)
+
+        # 返回目標位置和旋轉
+        # return target_position_world, target_orientation_quaternion
+
+    
+
+    def project_yolo_to_world_target(self, offset_distance=0.1, step_size=0.01, tolerance=0.05):
+        """
+        將 YOLO 偵測到的物體坐標投射到 PyBullet 世界坐標系中的末端執行器前方，並逐步移動到目標位置。
+        同時將 y 和 z 偏移量控制在容忍範圍內。
+
+        Args:
+            offset_distance (float): 偏移距離，用於將坐標投射到末端執行器的前方（單位：米）。
+            step_size (float): 每次更新的位置增量。
+            tolerance (float): y 和 z 軸偏移的容忍範圍。
+
+        Returns:
+            np.array: 最終的世界坐標位置。
+        """
+        # 獲取 YOLO 偵測到的物體偏移座標
+        yolo_coordinates = self.data_processor.get_processed_yolo_detection_position()
+
+        # 檢查 y 和 z 偏移量是否在容忍範圍內
+        y_in_range = abs(yolo_coordinates[1]) < tolerance
+        z_in_range = abs(yolo_coordinates[2]) < tolerance
+
+        # 如果 y 和 z 都在範圍內，無需移動
+        if y_in_range and z_in_range:
+            print("目標物已在範圍內，無需移動")
+            return np.array(self.ik_solver.get_current_pose()[0])  # 返回當前末端位置
+
+        # 若不在範圍內，則將 y 和 z 偏移量限制在容忍範圍內
+        if not y_in_range:
+            yolo_coordinates[1] = max(min(yolo_coordinates[1], tolerance), -tolerance)
+        if not z_in_range:
+            yolo_coordinates[2] = max(min(yolo_coordinates[2], tolerance), -tolerance)
+
+        # 獲取末端執行器的世界位置和旋轉矩陣
+        end_effector_position_world, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
+
+        # 計算目標相機位置，考慮到 z 軸的 offset_distance
+        target_position_camera = np.array(yolo_coordinates) + np.array([0, 0, offset_distance])
+
+        # 計算目標位置的世界坐標
+        target_position_world = np.array(end_effector_position_world) + end_effector_rotation_matrix @ target_position_camera
+
+        # 計算當前位置與目標位置之間的方向
+        direction_vector = target_position_world - np.array(end_effector_position_world)
+        distance_to_move = np.linalg.norm(direction_vector)
+
+        # 如果需要移動的距離小於 step_size，直接移動到目標位置
+        if distance_to_move <= step_size:
+            self.move_to_position(target_position_world)
+            self.ros_communicator.publish_coordinates(target_position_world[0], target_position_world[1], target_position_world[2])
+            return target_position_world
+
+        # 否則，移動一個增量
+        direction_unit_vector = direction_vector / distance_to_move  # 歸一化方向向量
+        incremental_position = np.array(end_effector_position_world) + direction_unit_vector * step_size
+        self.move_to_position(incremental_position)
+        self.ros_communicator.publish_coordinates(incremental_position[0], incremental_position[1], incremental_position[2])
+
+
+
 
 
     def project_yolo_to_world_fixed_depth(self, offset_distance=0.1):
         """
         將 YOLO 偵測到的物體坐標投射到 PyBullet 世界座標系中的末端執行器前方，
-        但保持 x 軸（深度）不變。
+        深度（x 軸）與末端執行器保持一致，y 和 z 偏移量根據 YOLO 偵測的座標進行調整。
 
         Args:
-            offset_distance (float): 偏移距離，用於將座標投射到末端執行器的前方（單位：米）
+            offset_distance (float): 偏移距離，用於將坐標投射到末端執行器的前方（單位：米）
 
         Returns:
             np.array: 投射後的世界座標
         """
-        # 獲取 YOLO 偵測的坐標
+        # 獲取 YOLO 偵測的偏移座標
         yolo_coordinates = self.data_processor.get_processed_yolo_detection_position()
         if len(yolo_coordinates) == 2:
             yolo_coordinates = np.append(yolo_coordinates, 0)  # 添加預設 z 值
-
-        # 保持 x 軸（深度）不變，只在 y 和 z 軸偏移
-        object_position_camera = np.array([yolo_coordinates[0], yolo_coordinates[1], yolo_coordinates[2] + offset_distance])
-
+        
         # 獲取末端執行器的世界位置和旋轉矩陣
         end_effector_position_world, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
+        
+        # 保持 x 軸（深度）與末端夾具一致，並在 y 和 z 軸上添加 YOLO 偵測的偏移
+        object_position_camera = np.array([
+            0,  # x 軸保持不變
+            yolo_coordinates[1],  # y 軸使用 YOLO 偵測到的偏移量
+            yolo_coordinates[2] + offset_distance  # z 軸使用 YOLO 偵測到的偏移量 + 前方偏移距離
+        ])
 
         # 將物體從相機坐標系轉換到世界坐標系
         object_position_world = np.array(end_effector_position_world) + end_effector_rotation_matrix @ object_position_camera
+        # 確保 x 軸深度與末端夾具保持一致
+        object_position_world[0] = end_effector_position_world[0]
+        
         return object_position_world
 
 
-        
+
+
+    # 更新電腦裡面手臂角度紀錄        
     def set_all_joint_angles(self, angles_degrees):
         """
         Sets all joints to the specified angles in degrees.
@@ -251,12 +547,10 @@ class ArmController():
         # 將每個角度設置到對應的關節
         for i, angle in enumerate(angles_degrees):
             self.joint_pos[i] = angle
-        
-        # 更新機器人位置
-        return self.joint_pos
-
-        
+    
+    # 更新實體和虛擬
     def update_action(self, joint_pos):
+        self.ik_solver.setJointPosition(joint_pos)
         self.ros_communicator.publish_robot_arm_angle(joint_pos)
         
     def clamp(self, value, min_value, max_value):

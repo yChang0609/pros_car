@@ -46,6 +46,12 @@ class RosCommunicator(Node):
             PointStamped, "/yolo/detection/position", self.yolo_detection_position_callback, 10
         )
 
+        # Subscribe to YOLO detected object coordinates
+        self.latest_yolo_offset = None
+        self.subscriber_yolo_offset = self.create_subscription(
+            PointStamped, "/yolo/detection/offset", self.yolo_detection_offset_callback, 10
+        )
+
         # publish car_C_rear_wheel and car_C_front_wheel
         self.publisher_rear = self.create_publisher(String, DeviceDataTypeEnum.car_C_rear_wheel, 10)
         self.publisher_forward = self.create_publisher(String, DeviceDataTypeEnum.car_C_front_wheel, 10)
@@ -165,6 +171,13 @@ class RosCommunicator(Node):
     def get_latest_yolo_detection_position(self):
         """Getter for the latest YOLO detected object coordinates."""
         if self.latest_yolo_coordinates is None:
-            self.get_logger().warn("No YOLO coordinates received yet.")
             return None
         return self.latest_yolo_coordinates
+    
+    def yolo_detection_offset_callback(self, msg):
+        self.latest_yolo_offset = msg
+    
+    def get_latest_yolo_detection_offset(self):
+        if self.latest_yolo_offset is None:
+            return None
+        return self.latest_yolo_offset

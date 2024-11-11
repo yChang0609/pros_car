@@ -337,16 +337,36 @@ class PybulletRobotController:
 
 
     # function to solve inverse kinematics
+    # 單獨使用要少取一個 因為會輸出 6
     def solveInversePositionKinematics(self, end_eff_pose):
-        # print('Inverse position kinematics')
-        joint_angles =  p.calculateInverseKinematics(self.robot_id,
-                                                    self.end_eff_index,
-                                                    targetPosition=end_eff_pose[0:3])
-                                                    # targetOrientation=p.getQuaternionFromEuler(end_eff_pose[3:6]))
-        # print('Joint angles:', joint_angles)
-        # self.markTarget(end_eff_pose[0:3])
-        self.markEndEffectorPath()  # 標記末端執行器位置
+        """
+        計算逆向運動學以獲取關節角度，基於給定的末端執行器姿勢。
+
+        Args:
+            end_eff_pose (list): 末端執行器的目標位置和姿勢，
+                                格式為 [x, y, z, roll, pitch, yaw] (6 個元素) 或 [x, y, z] (3 個元素)。
+
+        Returns:
+            list: 對應的關節角度。
+        """
+        if len(end_eff_pose) == 6:
+            joint_angles = p.calculateInverseKinematics(
+                self.robot_id,
+                self.end_eff_index,
+                targetPosition=end_eff_pose[0:3],
+                targetOrientation=p.getQuaternionFromEuler(end_eff_pose[3:6])
+            )
+        else:
+            joint_angles = p.calculateInverseKinematics(
+                self.robot_id,
+                self.end_eff_index,
+                targetPosition=end_eff_pose[0:3]
+            )
+
+        # 標記末端執行器的位置路徑
+        self.markEndEffectorPath()
         return joint_angles
+
 
 
     def markEndEffector(self):

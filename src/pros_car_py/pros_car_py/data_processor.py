@@ -56,6 +56,13 @@ class DataProcessor:
             
             else:
                 return None
+    
+    def get_processed_yolo_detection_offset(self):
+        yolo_detection_offset_msg = self.ros_communicator.get_latest_yolo_detection_offset()
+        if yolo_detection_offset_msg is not None:
+            return [yolo_detection_offset_msg.point.x, yolo_detection_offset_msg.point.y, yolo_detection_offset_msg.point.z]
+        else:
+            return None
 
     def get_processed_received_global_plan(self):
         received_global_plan_msg = self.ros_communicator.get_latest_received_global_plan()

@@ -106,7 +106,7 @@ class ArmController():
                 if mode == "auto_arm_control":
                     # coordinate = self.get_forward_position(offset_distance=0.3)
                     # self.move_to_position(coordinate)
-                    self.align_to_target_with_yolo_offset()
+                    self.align_to_target_with_yolo_offset(num_segments=2, tolerance=0.03)
                     # world_created_position = self.project_yolo_to_world()
                     # self.publish_coordinates(world_created_position[0], world_created_position[1], world_created_position[2])
                     # self.gradual_move(world_created_position)
@@ -129,36 +129,52 @@ class ArmController():
         self.action_in_progress = False
 
     
-    def align_to_target_with_yolo_offset(self, step_size=0.05, tolerance=0.03):
+    def align_to_target_with_yolo_offset(self, num_segments=10, tolerance=0.03):
         """
-        根據 YOLO 偵測到的偏移量，逐步調整機械手臂的末端位置，使其對準目標物體的中心。
+        根據 YOLO 偵測到的偏移量，逐步且平滑地將機械手臂的末端位置移動，使其對準目標物體的中心。
 
         Args:
-            step_size (float): 每次移動的增量距離，默認為 0.05 米。
+            num_segments (int): 分段移動的段數，預設為 10 段。
             tolerance (float): 允許的偏移量容忍範圍，默認為 0.03 米。
         """
-        # 獲取物體在相機畫面中的偏移量
-        x_offset, y_offset, _ = self.data_processor.get_processed_yolo_detection_offset()
+        for step in range(num_segments):
+            # 獲取物體在相機畫面中的偏移量
+            x_offset, y_offset, _ = self.data_processor.get_processed_yolo_detection_offset()
 
-        # 檢查偏移量是否已經在允許的容忍範圍內
-        if abs(x_offset) <= tolerance and abs(y_offset) <= tolerance:
-            print("已對準，停止校正")
-            return True
+            # 檢查偏移量是否已經在允許的容忍範圍內
+            if abs(x_offset) <= tolerance and abs(y_offset) <= tolerance:
+                print("已對準，停止校正")
+                return True
 
-        # 獲取末端執行器的當前旋轉矩陣
-        _, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
+            # 獲取末端執行器的當前位置和旋轉矩陣
+            end_effector_position_world, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
 
-        # 根據畫面座標系將 x_offset, y_offset 轉換到夾具的本地座標系
-        # x_offset 對應夾具的 Y 軸移動方向，y_offset 對應夾具的 Z 軸移動方向
-        move_vector = end_effector_rotation_matrix @ np.array([0, -x_offset, y_offset])
+            # 計算本地偏移向量並轉換為世界座標系下的移動向量
+            move_vector_local = np.array([0, -x_offset, y_offset])
+            move_vector_world = end_effector_rotation_matrix @ move_vector_local
 
-        # 將移動向量歸一化並乘以 step_size 以控制移動步長
-        move_vector = move_vector / np.linalg.norm(move_vector) * step_size
+            # 計算每段的移動向量
+            segment_move_vector = move_vector_world / num_segments
 
-        # 移動機械手臂的末端執行器
-        self.move_end_effector(x_offset=move_vector[0], y_offset=move_vector[1], z_offset=move_vector[2])
+            # 計算本次目標位置並移動
+            target_position_world = end_effector_position_world + segment_move_vector
+            self.move_to_position(target_position_world)
+
+            # 更新當前末端執行器的位置
+            end_effector_position_world = target_position_world
+
+            # 發佈當前位置
+            self.ros_communicator.publish_coordinates(
+                target_position_world[0],
+                target_position_world[1],
+                target_position_world[2]
+            )
 
         print("最終對準完成")
+
+
+
+
 
     
     def move_end_effector(self, x_offset=0.0, y_offset=0.0, z_offset=0.0):

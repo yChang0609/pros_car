@@ -327,7 +327,7 @@ class PybulletRobotController:
                 # 直接存儲弧度值
                 joint_angles_in_radians.append(joint_angles[:len(self.controllable_joints)])
                 
-                self.setJointPosition(joint_angles[:len(self.controllable_joints)])
+                # self.setJointPosition(joint_angles[:len(self.controllable_joints)])
                 time.sleep(0.1)  # 加入延遲觀察
             else:
                 print("無法找到合適的解。")

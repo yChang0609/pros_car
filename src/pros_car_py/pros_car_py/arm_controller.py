@@ -45,9 +45,7 @@ class ArmController():
         self.num_joints = num_joints
         self.joint_pos = []
         self.key = 0
-        self.joint_pos = [0.0] * self.num_joints  # 初始化為包含所有關節的列表
-        self.reset_arm(all_angle_degrees = 90.0)
-        self.update_action(self.joint_pos)
+        
         self.world_created = False
         self.is_moving = False
         self.action_in_progress = False  # 動作進行中的標誌
@@ -55,10 +53,17 @@ class ArmController():
         self.x = 0
         self.y = 0
 
+    def ensure_joint_pos_initialized(self):
+        if self.joint_pos is None or len(self.joint_pos) < self.num_joints:
+            self.joint_pos = [0.0] * self.num_joints
+            self.reset_arm(all_angle_degrees=90.0)
+            self.update_action(self.joint_pos)
+
         
         
 
     def manual_control(self, key):
+        self.ensure_joint_pos_initialized()
         if key == 'b': # Reset arm
             self.reset_arm(all_angle_degrees = 90.0)
         elif key == 'j':
@@ -95,21 +100,37 @@ class ArmController():
     
     # auto control--------------------------------------------------
     def auto_control(self, key=None, mode="auto_arm_control"):
+        self.ensure_joint_pos_initialized()
         if key == "q":
-            # self.reset_arm(all_angle_degrees = 90.0)
-            # self.update_action(self.joint_pos)
-            # self.ik_solver.stop_simulation()
             self.action_in_progress = False
             return True
         else:
             try:
                 if mode == "auto_arm_control":
-                    # coordinate = self.get_forward_position(offset_distance=0.3)
+                    
+                    self.set_last_joint_angle(45.0)
+                    world_created_position = self.project_yolo_to_world()
+                    self.ik_solver.setJointPosition(self.joint_pos)
+                    self.gradual_move(world_created_position)
+                    self.ik_solver.setJointPosition(self.joint_pos)
+                    time.sleep(0.1)
+
+                    for i in range(10):
+                        if self.align_to_target_with_yolo_offset(tolerance=0.03):
+                            break
+                    time.sleep(1.0)
+                    self.pounce_action()
+                    # self.ik_solver.setJointPosition(self.joint_pos)
+                    # time.sleep(0.5)
+                    # coordinate = self.get_forward_position(offset_distance=0.3, z_offset=0.05)
                     # self.move_to_position(coordinate)
-                    self.align_to_target_with_yolo_offset(num_segments=2, tolerance=0.03)
-                    # world_created_position = self.project_yolo_to_world()
-                    # self.publish_coordinates(world_created_position[0], world_created_position[1], world_created_position[2])
-                    # self.gradual_move(world_created_position)
+                    time.sleep(1.0)
+                    self.set_last_joint_angle(10.0)
+                    time.sleep(1.0)
+                    self.reset_arm(all_angle_degrees=90.0)
+                    self.set_last_joint_angle(70.0)
+                    self.update_action(self.joint_pos)
+                    return True
                 elif mode == "human_like_wave":
                     self.human_like_wave(num_moves=1, steps=10)
             except Exception as e:
@@ -117,62 +138,83 @@ class ArmController():
     
     def publish_coordinates(self, x, y, z):
         self.ros_communicator.publish_coordinates(x, y, z)
+    
+    def calibrate_arm(self):
+        print("開始校正")
+        self.update_action(self.joint_pos)
 
     def move_to_position(self, object_position_world):
         self.action_in_progress = True
         joint_angles = self.ik_solver.solveInversePositionKinematics(object_position_world)
         joint_angles = joint_angles[:-1]
-        self.ik_solver.setJointPosition(joint_angles)
-          # 將 joint_angles 賦值給 self.joint_pos
+        self.joint_pos = list(joint_angles)
         self.update_action(joint_angles)  # 更新動作
-        time.sleep(5.0)
+        time.sleep(1.0)
         self.action_in_progress = False
 
     
-    def align_to_target_with_yolo_offset(self, num_segments=10, tolerance=0.03):
+    def align_to_target_with_yolo_offset(self, step_size=0.05, tolerance=0.03):
         """
-        根據 YOLO 偵測到的偏移量，逐步且平滑地將機械手臂的末端位置移動，使其對準目標物體的中心。
+        根據 YOLO 偵測到的偏移量，逐步調整機械手臂的末端位置，使其對準目標物體的中心。
 
         Args:
-            num_segments (int): 分段移動的段數，預設為 10 段。
+            step_size (float): 每次移動的增量距離，默認為 0.05 米。
             tolerance (float): 允許的偏移量容忍範圍，默認為 0.03 米。
         """
-        for step in range(num_segments):
-            # 獲取物體在相機畫面中的偏移量
-            x_offset, y_offset, _ = self.data_processor.get_processed_yolo_detection_offset()
+        # 獲取物體在相機畫面中的偏移量
+        x_offset, y_offset, _ = self.data_processor.get_processed_yolo_detection_offset()
 
-            # 檢查偏移量是否已經在允許的容忍範圍內
-            if abs(x_offset) <= tolerance and abs(y_offset) <= tolerance:
-                print("已對準，停止校正")
-                return True
+        # 檢查偏移量是否已經在允許的容忍範圍內
+        if abs(x_offset) <= tolerance and abs(y_offset) <= tolerance:
+            print("已對準，停止校正")
+            return True
 
-            # 獲取末端執行器的當前位置和旋轉矩陣
-            end_effector_position_world, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
+        # 獲取末端執行器的當前旋轉矩陣
+        _, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
 
-            # 計算本地偏移向量並轉換為世界座標系下的移動向量
-            move_vector_local = np.array([0, -x_offset, y_offset])
-            move_vector_world = end_effector_rotation_matrix @ move_vector_local
+        # 根據畫面座標系將 x_offset, y_offset 轉換到夾具的本地座標系
+        # x_offset 對應夾具的 Y 軸移動方向，y_offset 對應夾具的 Z 軸移動方向
+        move_vector = end_effector_rotation_matrix @ np.array([0, -x_offset, y_offset])
 
-            # 計算每段的移動向量
-            segment_move_vector = move_vector_world / num_segments
+        # 將移動向量歸一化並乘以 step_size 以控制移動步長
+        move_vector = move_vector / np.linalg.norm(move_vector) * step_size
 
-            # 計算本次目標位置並移動
-            target_position_world = end_effector_position_world + segment_move_vector
-            self.move_to_position(target_position_world)
-
-            # 更新當前末端執行器的位置
-            end_effector_position_world = target_position_world
-
-            # 發佈當前位置
-            self.ros_communicator.publish_coordinates(
-                target_position_world[0],
-                target_position_world[1],
-                target_position_world[2]
-            )
+        # 移動機械手臂的末端執行器
+        self.move_end_effector(x_offset=move_vector[0], y_offset=move_vector[1], z_offset=move_vector[2])
 
         print("最終對準完成")
 
 
+
+    def pounce_action(self):
+        """
+        進行往前撲的動作，第二軸增加20度但不超過上限，第三軸減少50度但不低於下限。
+        """
+        # 確保 joint_pos 已初始化
+        self.ensure_joint_pos_initialized()
+
+        # 獲取目前的第二軸角度（度數）
+        current_angle_joint_1 = math.degrees(self.joint_pos[1])
+        
+        # 計算所需增量，確保不超過120度的上限
+
+        # 第二軸增加 delta_joint_1 度
+        
+        self.adjust_joint_angle(joint_id=2, delta_angle=-60, min_angle=0, max_angle=150)
+        self.update_action(self.joint_pos)
+        time.sleep(0.5)
+
+        # 獲取目前的第三軸角度（度數）
+        current_angle_joint_2 = math.degrees(self.joint_pos[2])
+        # 計算所需減量，確保不低於0度的下限
+        self.adjust_joint_angle(joint_id=1, delta_angle=40, min_angle=0, max_angle=120)
+        # 第三軸減少 delta_joint_2 度
+        
+
+        # 更新動作以應用變更
+        self.update_action(self.joint_pos)
+        print("完成往前撲的動作")
+        time.sleep(0.5)
 
 
 
@@ -206,39 +248,48 @@ class ArmController():
 
 
 
-    def get_forward_position(self, offset_distance=0.05):
+    def get_forward_position(self, offset_distance=0.05, z_offset=0.02):
         """
-        根據當前末端執行器的方向，計算指定距離前方的目標座標。
+        根據當前末端執行器的方向，計算指定距離前方且稍微向上的目標座標。
 
         Args:
-            offset_distance (float): 偏移距離（單位：米），指定末端執行器正前方的距離，預設為 0.01 米。
+            offset_distance (float): 偏移距離（單位：米），指定末端執行器正前方的距離，預設為 0.05 米。
+            z_offset (float): Z 軸的向上偏移量（單位：米），預設為 0.02 米。
 
         Returns:
             np.array: 目標位置的世界座標。
         """
+        print("開始計算前進位置")
         # 獲取末端執行器的當前位置和旋轉矩陣
+        self.ik_solver.setJointPosition(self.joint_pos) 
         end_effector_position_world, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
 
         # 獲取末端執行器當前的 X 軸方向向量，表示正前方
         forward_direction = end_effector_rotation_matrix @ np.array([1, 0, 0])
 
-        # 計算正前方的目標位置
-        target_position_world = np.array(end_effector_position_world) + forward_direction * offset_distance
+        # 計算正前方且稍微向上的目標位置
+        target_position_world = (
+            np.array(end_effector_position_world) +
+            forward_direction * offset_distance +
+            np.array([0, 0, z_offset])  # 添加 Z 軸偏移
+        )
 
         return target_position_world
 
     def gradual_move(self, object_position_world):
+        print("開始緩慢移動")
         self.action_in_progress = True
-        joint_angles_sequence = self.ik_solver.moveTowardsTarget(object_position_world, steps=5)
+        joint_angles_sequence = self.ik_solver.moveTowardsTarget(object_position_world, steps=30)
         joint_angles_sequence = joint_angles_sequence[:-1]
         for joint_angles in joint_angles_sequence:
             depth = self.data_processor.get_processed_yolo_detection_position()[0]
             print(depth)
-            if depth < 0.35:
+            if depth < 0.3:
                 self.action_in_progress = False
                 break
             self.set_all_joint_angles(joint_angles)
             self.update_action(self.joint_pos)
+            self.ik_solver.setJointPosition(self.joint_pos)
             time.sleep(0.5)
         self.action_in_progress = False
 
@@ -701,6 +752,29 @@ class ArmController():
             }
         ]
         self.set_multiple_joint_positions(joint_configs)
+
+    def set_last_joint_angle(self,target_angle, min_angle=10, max_angle=70):
+        """
+        直接設定機械手臂最後一軸的角度。
+
+        Args:
+            target_angle (float): 想要設定的目標角度（以度數為單位）。
+            min_angle (float): 最小允許角度（默認為 10 度）。
+            max_angle (float): 最大允許角度（默認為 70 度）。
+        """
+        # 確保 joint_pos 已初始化
+        self.ensure_joint_pos_initialized()
+
+        # 限制新角度在 min_angle 和 max_angle 之間
+        clamped_angle = max(min(target_angle, max_angle), min_angle)
+
+        # 更新最後一軸的角度，並轉換為 radians
+        self.joint_pos[-1] = math.radians(clamped_angle)
+
+        # 更新動作
+        self.update_action(self.joint_pos)
+
+
 
     def adjust_joint_angle(self, joint_id, delta_angle, min_angle=-90, max_angle=90):
         """

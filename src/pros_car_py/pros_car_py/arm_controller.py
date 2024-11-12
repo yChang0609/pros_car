@@ -110,19 +110,21 @@ class ArmController():
             try:
                 if mode == "auto_arm_control":
                     self.ros_communicator.publish_target_label("fire")
-                    self.set_last_joint_angle(45.0)
-                    world_created_position = self.project_yolo_to_world()
-                    self.ik_solver.setJointPosition(self.joint_pos)
-                    self.gradual_move(world_created_position)
-                    self.ik_solver.setJointPosition(self.joint_pos)
-                    time.sleep(0.1)
-
                     
-                    self.align_to_target_with_yolo_offset(tolerance=0.03)
+                    # self.set_last_joint_angle(45.0)
+                    # world_created_position = self.project_yolo_to_world()
+                    # self.ik_solver.setJointPosition(self.joint_pos)
+                    # self.gradual_move(world_created_position)
+                    # self.ik_solver.setJointPosition(self.joint_pos)
+                    # time.sleep(0.1)
+            
+                    
+                    self.align_to_target_with_yolo_offset(tolerance=0.05)
                     time.sleep(1.0)
 
                     # self.pounce_action()
-                    target_position_world = self.get_forward_position()
+                    depth = self.data_processor.get_processed_yolo_detection_position()[0]
+                    target_position_world = self.get_forward_position(offset_distance=depth+0.1,z_offset=0.2)
                     self.move_to_position(target_position_world)
 
 
@@ -150,9 +152,10 @@ class ArmController():
         self.update_action(joint_angles)  # 更新動作
         time.sleep(1.0)
         self.action_in_progress = False
+    
 
     
-    def align_to_target_with_yolo_offset(self, step_size=0.05, tolerance=0.03):
+    def align_to_target_with_yolo_offset(self, step_size=0.07, tolerance=0.03):
         """
         根據 YOLO 偵測到的偏移量，逐步調整機械手臂的末端位置，使其對準目標物體的中心。
 
@@ -163,6 +166,9 @@ class ArmController():
         # 獲取物體在相機畫面中的偏移量
         for _ in range(10):
             x_offset, y_offset, _ = self.data_processor.get_processed_yolo_detection_offset()
+            depth = self.data_processor.get_processed_yolo_detection_position()[0]
+            print(f"depth: {depth}")
+            
 
             # 檢查偏移量是否已經在允許的容忍範圍內
             if abs(x_offset) <= tolerance and abs(y_offset) <= tolerance:
@@ -185,7 +191,7 @@ class ArmController():
 
             print("最終對準完成")
 
-
+    
 
     def pounce_action(self):
         """

@@ -53,6 +53,8 @@ class ArmController():
         self.x = 0
         self.y = 0
 
+        self.latest_align_coordinates = None
+
     def ensure_joint_pos_initialized(self):
         if self.joint_pos is None or len(self.joint_pos) < self.num_joints:
             self.joint_pos = [0.0] * self.num_joints
@@ -107,7 +109,7 @@ class ArmController():
         else:
             try:
                 if mode == "auto_arm_control":
-                    
+                    self.ros_communicator.publish_target_label("fire")
                     self.set_last_joint_angle(45.0)
                     world_created_position = self.project_yolo_to_world()
                     self.ik_solver.setJointPosition(self.joint_pos)
@@ -115,21 +117,22 @@ class ArmController():
                     self.ik_solver.setJointPosition(self.joint_pos)
                     time.sleep(0.1)
 
-                    for i in range(10):
-                        if self.align_to_target_with_yolo_offset(tolerance=0.03):
-                            break
+                    
+                    self.align_to_target_with_yolo_offset(tolerance=0.03)
                     time.sleep(1.0)
-                    self.pounce_action()
-                    # self.ik_solver.setJointPosition(self.joint_pos)
-                    # time.sleep(0.5)
-                    # coordinate = self.get_forward_position(offset_distance=0.3, z_offset=0.05)
-                    # self.move_to_position(coordinate)
+
+                    # self.pounce_action()
+                    target_position_world = self.get_forward_position()
+                    self.move_to_position(target_position_world)
+
+
                     time.sleep(1.0)
                     self.set_last_joint_angle(10.0)
                     time.sleep(1.0)
                     self.reset_arm(all_angle_degrees=90.0)
                     self.set_last_joint_angle(70.0)
                     self.update_action(self.joint_pos)
+
                     return True
                 elif mode == "human_like_wave":
                     self.human_like_wave(num_moves=1, steps=10)
@@ -138,10 +141,6 @@ class ArmController():
     
     def publish_coordinates(self, x, y, z):
         self.ros_communicator.publish_coordinates(x, y, z)
-    
-    def calibrate_arm(self):
-        print("開始校正")
-        self.update_action(self.joint_pos)
 
     def move_to_position(self, object_position_world):
         self.action_in_progress = True
@@ -162,27 +161,29 @@ class ArmController():
             tolerance (float): 允許的偏移量容忍範圍，默認為 0.03 米。
         """
         # 獲取物體在相機畫面中的偏移量
-        x_offset, y_offset, _ = self.data_processor.get_processed_yolo_detection_offset()
+        for _ in range(10):
+            x_offset, y_offset, _ = self.data_processor.get_processed_yolo_detection_offset()
 
-        # 檢查偏移量是否已經在允許的容忍範圍內
-        if abs(x_offset) <= tolerance and abs(y_offset) <= tolerance:
-            print("已對準，停止校正")
-            return True
+            # 檢查偏移量是否已經在允許的容忍範圍內
+            if abs(x_offset) <= tolerance and abs(y_offset) <= tolerance:
+                print("已對準，停止校正")
+                self.update_action(self.joint_pos)
+                return True
+            
+            # 獲取末端執行器的當前旋轉矩陣
+            _, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
 
-        # 獲取末端執行器的當前旋轉矩陣
-        _, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
+            # 根據畫面座標系將 x_offset, y_offset 轉換到夾具的本地座標系
+            # x_offset 對應夾具的 Y 軸移動方向，y_offset 對應夾具的 Z 軸移動方向
+            move_vector = end_effector_rotation_matrix @ np.array([0, -x_offset, y_offset])
 
-        # 根據畫面座標系將 x_offset, y_offset 轉換到夾具的本地座標系
-        # x_offset 對應夾具的 Y 軸移動方向，y_offset 對應夾具的 Z 軸移動方向
-        move_vector = end_effector_rotation_matrix @ np.array([0, -x_offset, y_offset])
+            # 將移動向量歸一化並乘以 step_size 以控制移動步長
+            move_vector = move_vector / np.linalg.norm(move_vector) * step_size
 
-        # 將移動向量歸一化並乘以 step_size 以控制移動步長
-        move_vector = move_vector / np.linalg.norm(move_vector) * step_size
+            # 移動機械手臂的末端執行器
+            self.move_end_effector(x_offset=move_vector[0], y_offset=move_vector[1], z_offset=move_vector[2])
 
-        # 移動機械手臂的末端執行器
-        self.move_end_effector(x_offset=move_vector[0], y_offset=move_vector[1], z_offset=move_vector[2])
-
-        print("最終對準完成")
+            print("最終對準完成")
 
 
 
@@ -236,7 +237,7 @@ class ArmController():
 
         # 使用 IK 移動到新的目標位置
         self.move_to_position(target_position_world)
-
+        self.latest_align_coordinates = target_position_world
         # 發佈新的目標位置
         self.ros_communicator.publish_coordinates(
             target_position_world[0],
@@ -244,37 +245,40 @@ class ArmController():
             target_position_world[2]
         )
 
-        print(f"移動到新位置: x={target_position_world[0]:.4f}, y={target_position_world[1]:.4f}, z={target_position_world[2]:.4f}")
+        # print(f"移動到新位置: x={target_position_world[0]:.4f}, y={target_position_world[1]:.4f}, z={target_position_world[2]:.4f}")
 
 
-
-    def get_forward_position(self, offset_distance=0.05, z_offset=0.02):
+    def get_forward_position(self, offset_distance=0.3, z_offset=0.2):
         """
         根據當前末端執行器的方向，計算指定距離前方且稍微向上的目標座標。
 
         Args:
-            offset_distance (float): 偏移距離（單位：米），指定末端執行器正前方的距離，預設為 0.05 米。
-            z_offset (float): Z 軸的向上偏移量（單位：米），預設為 0.02 米。
+            offset_distance (float): 偏移距離（單位：米），指定末端執行器正前方的距離，預設為 0.2 米。
+            z_offset (float): Z 軸的向上偏移量（單位：米），默認為 0.1 米。
 
         Returns:
             np.array: 目標位置的世界座標。
         """
         print("開始計算前進位置")
+        # 設定關節位置
+        self.ik_solver.setJointPosition(self.joint_pos)
+        
         # 獲取末端執行器的當前位置和旋轉矩陣
-        self.ik_solver.setJointPosition(self.joint_pos) 
-        end_effector_position_world, end_effector_rotation_matrix = self.ik_solver.get_current_pose()
+        end_effector_position_world, end_effector_rotation_matrix = self.ik_solver.get_current_pose(link_index=-1)
+        
+        # 計算 Z 軸向上偏移
+        z_axis_direction = end_effector_rotation_matrix[:, 2]  # 第三列為 z 軸方向向量
+        offset_position_world = end_effector_position_world + z_axis_direction * z_offset  # 沿 z 軸方向移動指定的偏移量
 
         # 獲取末端執行器當前的 X 軸方向向量，表示正前方
-        forward_direction = end_effector_rotation_matrix @ np.array([1, 0, 0])
-
-        # 計算正前方且稍微向上的目標位置
-        target_position_world = (
-            np.array(end_effector_position_world) +
-            forward_direction * offset_distance +
-            np.array([0, 0, z_offset])  # 添加 Z 軸偏移
-        )
-
+        forward_direction = end_effector_rotation_matrix[:, 0]  # 第一列為 x 軸方向向量
+        
+        # 計算最終目標位置，沿 x 軸方向延伸 offset_distance
+        target_position_world = offset_position_world + forward_direction * offset_distance
+        
         return target_position_world
+
+    
 
     def gradual_move(self, object_position_world):
         print("開始緩慢移動")
@@ -282,8 +286,15 @@ class ArmController():
         joint_angles_sequence = self.ik_solver.moveTowardsTarget(object_position_world, steps=30)
         joint_angles_sequence = joint_angles_sequence[:-1]
         for joint_angles in joint_angles_sequence:
+
             depth = self.data_processor.get_processed_yolo_detection_position()[0]
-            print(depth)
+            detection_status = self.ros_communicator.get_latest_yolo_detection_status()
+
+            if detection_status == None:
+                print("no detection")
+                if self.align_to_target_with_yolo_offset(tolerance=0.03):
+                    break
+
             if depth < 0.3:
                 self.action_in_progress = False
                 break

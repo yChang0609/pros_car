@@ -6,11 +6,12 @@ from geometry_msgs.msg import (
 )
 from std_msgs.msg import String, Header
 from nav_msgs.msg import Path
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import LaserScan, Imu
 from trajectory_msgs.msg import JointTrajectoryPoint
 import orjson
 from pros_car_py.ros_communicator_config import ACTION_MAPPINGS
 from geometry_msgs.msg import PointStamped
+from std_msgs.msg import String, Bool
 
 class RosCommunicator(Node):
     def __init__(self):
@@ -52,6 +53,19 @@ class RosCommunicator(Node):
             PointStamped, "/yolo/detection/offset", self.yolo_detection_offset_callback, 10
         )
 
+        self.latest_yolo_detection_status = None
+        self.subscriber_yolo_detection_status = self.create_subscription(
+            Bool, "/yolo/detection/status", self.yolo_detection_status_callback, 10
+        )
+
+        self.latest_imu_data = None
+        self.imu_sub = self.create_subscription(
+            Imu,
+            '/imu/data',  # 替换为您的 IMU 话题名称
+            self.imu_data_callback,
+            10
+        )
+
         # publish car_C_rear_wheel and car_C_front_wheel
         self.publisher_rear = self.create_publisher(String, DeviceDataTypeEnum.car_C_rear_wheel, 10)
         self.publisher_forward = self.create_publisher(String, DeviceDataTypeEnum.car_C_front_wheel, 10)
@@ -66,6 +80,10 @@ class RosCommunicator(Node):
 
         self.publisher_coordinates = self.create_publisher(
             PointStamped, "/coordinates", 10
+        )
+
+        self.publisher_target_label = self.create_publisher(
+            String, "/target_label", 10
         )
 
     # amcl_pose callback and get_latest_amcl_pose
@@ -181,3 +199,24 @@ class RosCommunicator(Node):
         if self.latest_yolo_offset is None:
             return None
         return self.latest_yolo_offset
+    
+    def publish_target_label(self, label):
+        target_label_msg = String()
+        target_label_msg.data = label
+        self.publisher_target_label.publish(target_label_msg)
+
+    def yolo_detection_status_callback(self, msg):
+        self.latest_yolo_detection_status = msg
+    
+    def get_latest_yolo_detection_status(self):
+        if self.latest_yolo_detection_status is None:
+            return None
+        return self.latest_yolo_detection_status
+    
+    def imu_data_callback(self, msg):
+        self.latest_imu_data = msg
+
+    def get_latest_imu_data(self):
+        if self.latest_imu_data is None:
+            return None
+        return self.latest_imu_data

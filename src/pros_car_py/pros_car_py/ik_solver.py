@@ -168,6 +168,9 @@ class PybulletRobotController:
 
         return link_position, rotation_matrix
 
+    def get_base_position(self):
+        base_position, base_orientation = p.getBasePositionAndOrientation(self.robot_id)
+        return base_position
 
 
     def get_camera_pose(self):

@@ -55,6 +55,8 @@ class ArmController():
 
         self.latest_align_coordinates = None
 
+        self.base_link_position = self.ik_solver.get_base_position()
+
     def ensure_joint_pos_initialized(self):
         if self.joint_pos is None or len(self.joint_pos) < self.num_joints:
             self.joint_pos = [0.0] * self.num_joints
@@ -109,37 +111,38 @@ class ArmController():
         else:
             try:
                 if mode == "auto_arm_control":
-                    self.ros_communicator.publish_target_label("fire")
-                    
-                    # self.set_last_joint_angle(45.0)
-                    # world_created_position = self.project_yolo_to_world()
-                    # self.ik_solver.setJointPosition(self.joint_pos)
-                    # self.gradual_move(world_created_position)
-                    # self.ik_solver.setJointPosition(self.joint_pos)
-                    # time.sleep(0.1)
-            
-                    
-                    self.align_to_target_with_yolo_offset(tolerance=0.05)
-                    time.sleep(1.0)
+                    # self.ros_communicator.publish_target_label("fire")
+                    # self.align_to_target_with_yolo_offset(tolerance=0.05)
+                    # time.sleep(1.0)
+                    # depth = self.data_processor.get_processed_yolo_detection_position()[0]
+                    # target_position_world = self.get_forward_position(offset_distance=depth+0.1,z_offset=0.2)
+                    # self.move_to_position(target_position_world)
+                    # time.sleep(1.0)
+                    # self.set_last_joint_angle(10.0)
+                    # time.sleep(1.0)
+                    # self.reset_arm(all_angle_degrees=90.0)
+                    # self.set_last_joint_angle(70.0)
+                    # self.update_action(self.joint_pos)
 
-                    # self.pounce_action()
-                    depth = self.data_processor.get_processed_yolo_detection_position()[0]
-                    target_position_world = self.get_forward_position(offset_distance=depth+0.1,z_offset=0.2)
-                    self.move_to_position(target_position_world)
+                    mediapipe_coords = self.get_mediapipe_data_coordinates()
+                    # mediapipe_coords = [0,0,0]
+                    self.move_to_position(mediapipe_coords)
+                    self.publish_coordinates(mediapipe_coords[0], mediapipe_coords[1], mediapipe_coords[2])
 
-
-                    time.sleep(1.0)
-                    self.set_last_joint_angle(10.0)
-                    time.sleep(1.0)
-                    self.reset_arm(all_angle_degrees=90.0)
-                    self.set_last_joint_angle(70.0)
-                    self.update_action(self.joint_pos)
-
-                    return True
+                    # return True
                 elif mode == "human_like_wave":
                     self.human_like_wave(num_moves=1, steps=10)
             except Exception as e:
                 print(f"Error in auto_control: {e}")
+    
+    def get_mediapipe_data_coordinates(self):
+        mediapipe_coords = self.data_processor.get_processed_mediapipe_data()
+        corrected_coords = mediapipe_coords + [0,0,24]
+        corrected_coords[0] = 0.3
+        if corrected_coords[2]<10:
+            corrected_coords[2] = 10
+        return mediapipe_coords
+        
     
     def publish_coordinates(self, x, y, z):
         self.ros_communicator.publish_coordinates(x, y, z)

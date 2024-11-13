@@ -43,6 +43,19 @@ class DataProcessor:
 
     import time
 
+    def get_processed_mediapipe_data(self):
+        mediapipe_data_msg = self.ros_communicator.get_latest_mediapipe_data()
+        
+        # 檢查是否接收到資料，並從中提取座標
+        if mediapipe_data_msg is not None:
+            # 將 x, y, z 座標放入列表
+            coordinates_list = [mediapipe_data_msg.x, mediapipe_data_msg.y, mediapipe_data_msg.z]
+            return coordinates_list
+        else:
+            # 如果資料為 None，返回空列表或其他指示資料無效的值
+            return []
+
+
     def get_processed_yolo_detection_position(self):
 
             yolo_detection_position_msg = self.ros_communicator.get_latest_yolo_detection_position()

@@ -3,6 +3,7 @@ from pros_car_py.car_models import DeviceDataTypeEnum, CarCControl
 from geometry_msgs.msg import (
     PoseWithCovarianceStamped,
     PoseStamped,
+    Point
 )
 from std_msgs.msg import String, Header
 from nav_msgs.msg import Path
@@ -60,10 +61,12 @@ class RosCommunicator(Node):
 
         self.latest_imu_data = None
         self.imu_sub = self.create_subscription(
-            Imu,
-            '/imu/data',  # 替换为您的 IMU 话题名称
-            self.imu_data_callback,
-            10
+            Imu,'/imu/data',self.imu_data_callback,10
+        )
+
+        self.latest_mediapipe_data = None
+        self.mediapipe_sub = self.create_subscription(
+            Point,'/mediapipe_data',self.mediapipe_data_callback,10
         )
 
         # publish car_C_rear_wheel and car_C_front_wheel
@@ -179,7 +182,15 @@ class RosCommunicator(Node):
         coordinate_msg.point.y = y
         coordinate_msg.point.z = z
         self.publisher_coordinates.publish(coordinate_msg)
-
+    
+    def mediapipe_data_callback(self, msg):
+        self.latest_mediapipe_data = msg
+    
+    def get_latest_mediapipe_data(self):
+        if self.latest_mediapipe_data is None:
+            self.get_logger().warn("No Mediapipe data received yet.")
+            return None
+        return self.latest_mediapipe_data
     
     # YOLO coordinates callback
     def yolo_detection_position_callback(self, msg):
@@ -220,3 +231,5 @@ class RosCommunicator(Node):
         if self.latest_imu_data is None:
             return None
         return self.latest_imu_data
+    
+    

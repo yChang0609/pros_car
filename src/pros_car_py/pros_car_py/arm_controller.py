@@ -125,7 +125,6 @@ class ArmController():
                     # self.update_action(self.joint_pos)
 
                     mediapipe_coords = self.get_mediapipe_data_coordinates()
-                    # mediapipe_coords = [0,0,0]
                     self.move_to_position(mediapipe_coords)
                     self.publish_coordinates(mediapipe_coords[0], mediapipe_coords[1], mediapipe_coords[2])
 

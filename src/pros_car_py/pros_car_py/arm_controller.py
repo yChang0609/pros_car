@@ -111,29 +111,41 @@ class ArmController():
         else:
             try:
                 if mode == "auto_arm_control":
-                    # self.ros_communicator.publish_target_label("fire")
-                    # self.align_to_target_with_yolo_offset(tolerance=0.05)
-                    # time.sleep(1.0)
-                    # depth = self.data_processor.get_processed_yolo_detection_position()[0]
-                    # target_position_world = self.get_forward_position(offset_distance=depth+0.1,z_offset=0.2)
-                    # self.move_to_position(target_position_world)
-                    # time.sleep(1.0)
-                    # self.set_last_joint_angle(10.0)
-                    # time.sleep(1.0)
-                    # self.reset_arm(all_angle_degrees=90.0)
-                    # self.set_last_joint_angle(70.0)
-                    # self.update_action(self.joint_pos)
+                    
 
                     mediapipe_coords = self.get_mediapipe_data_coordinates()
                     self.move_to_position(mediapipe_coords)
                     self.publish_coordinates(mediapipe_coords[0], mediapipe_coords[1], mediapipe_coords[2])
 
-                    # return True
-                elif mode == "human_like_wave":
+                    # self.human_like_wave(num_moves=1, steps=10)
+                elif mode=="auto_arm_grap":
+                    self.ros_communicator.publish_target_label("fire")
+                    self.set_last_joint_angle(70.0)
+                    self.align_to_target_with_yolo_offset(tolerance=0.05)
+                    time.sleep(1.0)
+                    depth = self.data_processor.get_processed_yolo_detection_position()[0]
+                    target_position_world = self.get_forward_position(offset_distance=depth+0.1,z_offset=0.2)
+                    self.move_to_position(target_position_world)
+                    time.sleep(1.0)
+                    self.set_last_joint_angle(10.0)
+                    time.sleep(1.0)
+                    self.reset_arm()
+                    # self.set_last_joint_angle(70.0)
+                    self.update_action(self.joint_pos)
+                    time.sleep(1)
+                    self.set_last_joint_angle(70.0)
+                    self.update_action(self.joint_pos)
+                    time.sleep(0.1)
+                    return True
+                elif mode == "auto_arm_human":
                     self.human_like_wave(num_moves=1, steps=10)
+                elif mode == "auto_arm_shake":
+                    self.shake()
             except Exception as e:
                 print(f"Error in auto_control: {e}")
     
+        
+
     def get_mediapipe_data_coordinates(self):
         mediapipe_coords = self.data_processor.get_processed_mediapipe_data()
         corrected_coords = mediapipe_coords + [0,0,24]
@@ -154,6 +166,14 @@ class ArmController():
         self.update_action(joint_angles)  # 更新動作
         time.sleep(1.0)
         self.action_in_progress = False
+    
+    def shake(self):
+        self.adjust_joint_angle(joint_id = 2, delta_angle = 10, min_angle=0, max_angle=180)
+        self.update_action(self.joint_pos)
+        time.sleep(0.5)
+        self.adjust_joint_angle(joint_id = 2, delta_angle = -10, min_angle=0, max_angle=180)
+        self.update_action(self.joint_pos)
+        time.sleep(0.5)
     
 
     
@@ -325,10 +345,24 @@ class ArmController():
     def human_like_wave(self, num_moves=5, steps=30):
         joint_angle_sequences = self.ik_solver.human_like_wave(num_moves=num_moves, steps=steps)
         for joint_angles in joint_angle_sequences:
+            # def set_joint_position(self, joint_index, target_angle, lower_limit, upper_limit):
+            
             self.ik_solver.setJointPosition(joint_angles)
             self.set_all_joint_angles(joint_angles)
+            # self.set_joint_position(1,self.joint_pos[1],50,60)
+            # print(self.joint_pos[2])
+            if self.joint_pos[0] < math.radians(30.0):
+                self.joint_pos[0] = math.radians(30.0)
+            if self.joint_pos[0] > math.radians(150.0):
+                self.joint_pos[0] = math.radians(150.0)
+            if self.joint_pos[2] < math.radians(40.0):
+                self.joint_pos[2] = math.radians(40.0)
+            if self.joint_pos[1] < math.radians(40.0):
+                self.joint_pos[1] = math.radians(40.0)
+            if self.joint_pos[1] > math.radians(100.0):
+                self.joint_pos[1] = math.radians(100.0)
             self.update_action(self.joint_pos)
-            time.sleep(0.01)
+            time.sleep(0.1)
 
 
     def process_yolo_coordinates(self):
@@ -732,7 +766,9 @@ class ArmController():
     def set_all_joint_positions(self, angle_degrees):
         angle_radians = math.radians(angle_degrees)
         self.joint_pos = [angle_radians] * self.num_joints
+    
         
+
     def reset_arm(self, all_angle_degrees = 90.0):
         """
         Resets the robotic arm to the default position (all angles set to 0).

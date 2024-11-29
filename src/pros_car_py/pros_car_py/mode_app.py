@@ -1,4 +1,5 @@
 import urwid
+import threading
 
 class ModeApp:
     def __init__(self, car_controller, arm_controller, custom_control):
@@ -138,6 +139,7 @@ class ModeApp:
         auto_control_loop()
 
         # Register the key handler to listen for 'q' to exit
+        
         def key_handler(key):
             if key == 'q':  # If 'q' is pressed, stop auto navigation
                 print("Exiting navigation...")
@@ -145,9 +147,10 @@ class ModeApp:
                 self.car_controller.auto_control(mode="auto_nav", key="q")
                 self.main_menu()
             else:
-                pass
+                self.car_controller.auto_control(mode="auto_nav", key=key)
 
         self.loop.unhandled_input = key_handler
+        key_handler('start')
 
 
 

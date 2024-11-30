@@ -164,6 +164,7 @@ class ModeApp:
         def key_handler(key):
             if key == 'q':  # If 'q' is pressed, stop auto navigation
                 print("Exiting navigation...")
+                self.clean_terminal()
                 self.auto_nav_running = False
                 self.car_controller.auto_control(mode="manual_auto_nav", key="q")
                 # self.main_menu()
@@ -172,6 +173,8 @@ class ModeApp:
                 self.car_controller.auto_control(mode="manual_auto_nav", key=key)
         self.loop.unhandled_input = key_handler
 
+    def clean_terminal(self):
+        print("\033[2J\033[H", end="")  # 清除螢幕並將光標移動到頂部
 
     def auto_arm_mode(self, sub_mode, key):
         """自動手臂模式"""

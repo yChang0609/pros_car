@@ -93,7 +93,7 @@ class CarController():
         else:
             pass
 
-    def auto_control(self, mode="auto_nav", target=None, key=None):
+    def auto_control(self, mode="manual_auto_nav", target=None, key=None):
         """
         自動控制邏輯
         Args:
@@ -109,8 +109,8 @@ class CarController():
             return True
         # 根據模式執行導航
         else:
-            if mode == "auto_nav":
+            if mode == "manual_auto_nav":
                 action_key = self.nav_processing.get_action_from_nav2_plan(goal_coordinates=None)
-            elif mode == "manual_nav":
+            elif mode == "target_auto_nav":
                 action_key = self.nav_processing.get_action_from_nav2_plan(goal_coordinates=target)
             self.ros_communicator.publish_car_control(action_key, publish_rear=True, publish_front=True)

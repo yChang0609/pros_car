@@ -6,7 +6,7 @@ class ModeApp:
         self.MODES = {
             'mode_vehicle': "Control Vehicle",
             'mode_arm': "Control Robotic Arm",
-            'mode_nav': "Autonomous Navigation",
+            'mode_auto_nav': ["manual_auto_nav", "target_auto_nav"],
             'mode_auto_arm': ["Arm Mode 1", "Arm Mode 2", "Arm Mode 3"],  # 橫向子模式
         }
         self.palette = [
@@ -15,7 +15,6 @@ class ModeApp:
         self.car_controller = car_controller
         self.arm_controller = arm_controller
         self.custom_control = custom_control
-        self.key_handler_registered = False
         self.loop = urwid.MainLoop(None, palette=self.palette)
 
     def main(self):
@@ -28,7 +27,7 @@ class ModeApp:
         menu_options = [
             (self.MODES['mode_vehicle'], lambda: self.switch_mode('mode_vehicle')),
             (self.MODES['mode_arm'], lambda: self.switch_mode('mode_arm')),
-            (self.MODES['mode_nav'], lambda: self.switch_mode('mode_nav')),
+            ("Auto Navigation", lambda: self.switch_mode('mode_auto_nav')),
             ("Automatic Arm Mode", lambda: self.switch_mode('mode_auto_arm')),
             ('Exit', self.exit_program),
         ]
@@ -48,6 +47,11 @@ class ModeApp:
                 self.MODES['mode_auto_arm'],
                 lambda sub_mode: self.arm_mode_handler(mode_name, sub_mode)
             )
+        elif mode_name == 'mode_auto_nav':
+            self.horizontal_select(
+                self.MODES['mode_auto_nav'],
+                lambda sub_mode: self.nav_mode_handler(mode_name, sub_mode)
+            )
         else:
             mode_label = self.MODES.get(mode_name, "Unknown Mode")
             text = urwid.Text(f"{mode_label}\nPress 'q' to return to the main menu.\n")
@@ -62,13 +66,13 @@ class ModeApp:
                     self.control_vehicle(key)
                 elif mode_name == 'mode_arm':
                     self.control_arm(key)
-                elif mode_name == 'mode_nav':
-                    self.auto_navigation()
+                # elif mode_name == 'mode_auto_nav':
+                #     self.auto_navigation()
             self.loop.widget = filler
             self.loop.unhandled_input = mode_handler
 
-            if mode_name == 'mode_nav':
-                self.auto_navigation()
+            # if mode_name == 'mode_auto_nav':
+            #     self.auto_navigation()
 
     def horizontal_select(self, options, on_select):
         """橫向選擇模式"""
@@ -111,6 +115,26 @@ class ModeApp:
 
         self.loop.widget = filler
         self.loop.unhandled_input = mode_handler
+    
+    def nav_mode_handler(self, parent_mode, sub_mode):
+        """處理自動導航子模式"""
+        mode_label = f"{self.MODES[parent_mode]} - {sub_mode}"
+        text = urwid.Text(f"{mode_label}\nPress 'q' to return to the selection menu.\n")
+        filler = urwid.Filler(text, valign='top')
+
+        def mode_handler(key):
+            if key == 'q':
+                self.switch_mode(parent_mode)
+            else:
+                # print(f"Automatic navigation Mode - {sub_mode}: Pressed {key}")
+                # self.car_controller.auto_control(mode=sub_mode, key=key)
+                # self.auto_nav_mode(sub_mode, key)
+                self.auto_navigation(parent_mode=parent_mode)
+
+        self.loop.widget = filler
+        self.loop.unhandled_input = mode_handler
+        
+        self.auto_navigation(parent_mode=parent_mode)
 
     def control_vehicle(self, key):
         """控制車體"""
@@ -126,30 +150,26 @@ class ModeApp:
         else:
             self.arm_controller.manual_control(key)
 
-    def auto_navigation(self):
+    def auto_navigation(self, parent_mode):
         """auto navigation mode"""
         # Set a flag to control the auto navigation loop
         self.auto_nav_running = True
 
         def auto_control_loop(loop=None, user_data=None):
             if self.auto_nav_running:
-                self.car_controller.auto_control(mode="auto_nav")
+                self.car_controller.auto_control(mode="manual_auto_nav")
                 # Schedule the next call to this function
                 self.loop.set_alarm_in(0.1, auto_control_loop)
-
-        # Start the auto navigation loop
         auto_control_loop()
-
-        # Register the key handler to listen for 'q' to exit
-        
         def key_handler(key):
             if key == 'q':  # If 'q' is pressed, stop auto navigation
                 print("Exiting navigation...")
                 self.auto_nav_running = False
-                self.car_controller.auto_control(mode="auto_nav", key="q")
-                self.main_menu()
+                self.car_controller.auto_control(mode="manual_auto_nav", key="q")
+                # self.main_menu()
+                self.switch_mode(parent_mode)
             else:
-                self.car_controller.auto_control(mode="auto_nav", key=key)
+                self.car_controller.auto_control(mode="manual_auto_nav", key=key)
         self.loop.unhandled_input = key_handler
 
 
@@ -159,6 +179,13 @@ class ModeApp:
             self.switch_mode('mode_auto_arm')  # 返回橫向選單
         else:
             print(f"Automatic Arm Mode - {sub_mode}: Pressed {key}")
+        
+    def auto_nav_mode(self, sub_mode, key):
+        """自動手臂模式"""
+        if key == 'q':
+            self.switch_mode('mode_auto_nav')
+        else:
+            print(f"Automatic navigation Mode - {sub_mode}: Pressed {key}")
 
     def exit_program(self):
         """退出程序"""

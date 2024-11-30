@@ -64,9 +64,11 @@ class ModeApp:
                     self.control_arm(key)
                 elif mode_name == 'mode_nav':
                     self.auto_navigation()
-
             self.loop.widget = filler
             self.loop.unhandled_input = mode_handler
+
+            if mode_name == 'mode_nav':
+                self.auto_navigation()
 
     def horizontal_select(self, options, on_select):
         """橫向選擇模式"""
@@ -125,7 +127,7 @@ class ModeApp:
             self.arm_controller.manual_control(key)
 
     def auto_navigation(self):
-        """自动导航模式"""
+        """auto navigation mode"""
         # Set a flag to control the auto navigation loop
         self.auto_nav_running = True
 
@@ -148,14 +150,7 @@ class ModeApp:
                 self.main_menu()
             else:
                 self.car_controller.auto_control(mode="auto_nav", key=key)
-
         self.loop.unhandled_input = key_handler
-        key_handler('start')
-
-
-
-
-
 
 
     def auto_arm_mode(self, sub_mode, key):

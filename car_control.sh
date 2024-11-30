@@ -42,5 +42,5 @@ docker run -it --rm \
     $PORT_MAPPING \
     --runtime nvidia \
     $device_options \
-    ghcr.io/otischung/pros_ai_image_pybullet:latest \
+    ghcr.io/otischung/pros_ai_image_pros_car:latest \
     /bin/bash

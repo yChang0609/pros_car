@@ -66,41 +66,48 @@ class ArmController():
         
         
 
-    def manual_control(self, key):
+    def manual_control(self, index, key):
+    # 定義每個軸的最小和最大角度
+        joint_limits = [
+            {'min_angle': 0, 'max_angle': 180},  # Joint 0
+            {'min_angle': 0, 'max_angle': 120}, # Joint 1
+            {'min_angle': 0, 'max_angle': 150}, # Joint 2
+            {'min_angle': 50, 'max_angle': 180},# Joint 3
+            {'min_angle': 10, 'max_angle': 70}  # Joint 4
+        ]
+
+        # 確保初始位置已初始化
         self.ensure_joint_pos_initialized()
-        if key == 'b': # Reset arm
-            self.reset_arm(all_angle_degrees = 90.0)
-        elif key == 'j':
-            self.adjust_joint_angle(joint_id = 0, delta_angle = 10, min_angle=0, max_angle=180)
-        elif key == 'l':
-            self.adjust_joint_angle(joint_id = 0, delta_angle = -10, min_angle=0, max_angle=180)
-        elif key == 'k':
-            self.adjust_joint_angle(joint_id = 1, delta_angle = 10, min_angle=0, max_angle=120)
-        elif key == 'i':
-            self.adjust_joint_angle(joint_id = 1, delta_angle = -10, min_angle=0, max_angle=120)
-        elif key == 'y':
-            self.adjust_joint_angle(joint_id = 2, delta_angle = -10, min_angle=0, max_angle=150)
-        elif key == 'h':
-            self.adjust_joint_angle(joint_id = 2, delta_angle = 10, min_angle=0, max_angle=150)
-        elif key == 'm':
-            self.adjust_joint_angle(joint_id = 3, delta_angle = 10, min_angle=50, max_angle=180)
-        elif key == 'n':
-            self.adjust_joint_angle(joint_id = 3, delta_angle = -10, min_angle=50, max_angle=180)
-        elif key == 'u':
-            self.adjust_joint_angle(joint_id = 4, delta_angle = 10, min_angle=10, max_angle=70)
-        elif key == 'o':
-            self.adjust_joint_angle(joint_id = 4, delta_angle = -10, min_angle=10, max_angle=70)
-        elif key == 'q':
-            return True
 
-        try:
-            object_position_world = self.project_yolo_to_world()
-            self.ros_communicator.publish_coordinates(object_position_world[0], object_position_world[1], object_position_world[2])
-        except:
-            pass
-        # self.ik_solver.setJointPosition(joint_angles)
+        # 獲取當前 joint 的限制
+        if 0 <= index < len(joint_limits):
+            min_angle = joint_limits[index]['min_angle']
+            max_angle = joint_limits[index]['max_angle']
 
+            # 根據按鍵調整角度
+            if key == 'i':  # 增加角度
+                self.adjust_joint_angle(joint_id=index, delta_angle=10, min_angle=min_angle, max_angle=max_angle)
+            elif key == 'k':  # 減少角度
+                self.adjust_joint_angle(joint_id=index, delta_angle=-10, min_angle=min_angle, max_angle=max_angle)
+            elif key == 'b':  # 重置手臂
+                self.reset_arm(all_angle_degrees=90.0)
+            elif key == 'q':  # 結束控制
+                return True
+            else:
+                print(f"按鍵 '{key}' 無效，請使用 'i', 'k', 'b', 或 'q'。")
+        else:
+            print(f"索引 {index} 無效，請確保其在範圍內（0-{len(joint_limits) - 1}）。")
         self.update_action(self.joint_pos)
+
+
+    # try:
+    #     object_position_world = self.project_yolo_to_world()
+    #     self.ros_communicator.publish_coordinates(object_position_world[0], object_position_world[1], object_position_world[2])
+    # except:
+    #     pass
+    #     # self.ik_solver.setJointPosition(joint_angles)
+
+    #     self.update_action(self.joint_pos)
     
     # auto control--------------------------------------------------
     def auto_control(self, key=None, mode="auto_arm_control"):

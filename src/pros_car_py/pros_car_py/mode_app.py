@@ -18,7 +18,6 @@ class ModeApp:
         self.loop = urwid.MainLoop(None, palette=self.palette)
 
     def main(self):
-        """啟動應用程序"""
         self.main_menu()
         self.loop.run()
 
@@ -45,12 +44,17 @@ class ModeApp:
         if mode_name == 'mode_auto_arm':
             self.horizontal_select(
                 self.MODES['mode_auto_arm'],
-                lambda sub_mode: self.arm_mode_handler(mode_name, sub_mode)
+                lambda sub_mode: self.arm_mode_handler(mode_name, sub_mode, is_auto_mode=True)
             )
         elif mode_name == 'mode_auto_nav':
             self.horizontal_select(
                 self.MODES['mode_auto_nav'],
                 lambda sub_mode: self.nav_mode_handler(mode_name, sub_mode)
+            )
+        elif mode_name == 'mode_arm':
+            self.horizontal_select(
+                ["0", "1", "2", "3", "4"],
+                lambda sub_mode: self.arm_mode_handler(mode_name, sub_mode, is_auto_mode=False)
             )
         else:
             mode_label = self.MODES.get(mode_name, "Unknown Mode")
@@ -64,15 +68,10 @@ class ModeApp:
                     self.main_menu()
                 elif mode_name == 'mode_vehicle':
                     self.control_vehicle(key)
-                elif mode_name == 'mode_arm':
-                    self.control_arm(key)
-                # elif mode_name == 'mode_auto_nav':
-                #     self.auto_navigation()
+                # elif mode_name == 'mode_arm':
+                #     self.control_arm(key)
             self.loop.widget = filler
             self.loop.unhandled_input = mode_handler
-
-            # if mode_name == 'mode_auto_nav':
-            #     self.auto_navigation()
 
     def horizontal_select(self, options, on_select):
         """橫向選擇模式"""
@@ -101,21 +100,28 @@ class ModeApp:
         self.loop.widget = urwid.Filler(render(), valign='top')
         self.loop.unhandled_input = key_handler
 
-    def arm_mode_handler(self, parent_mode, sub_mode):
-        """處理自動手臂子模式"""
-        mode_label = f"{self.MODES[parent_mode]} - {sub_mode}"
+    def arm_mode_handler(self, parent_mode, sub_mode, is_auto_mode=False):
+        """Handles both manual and automatic arm sub-modes."""
+        self.sub_mode = sub_mode
+        mode_type = "Automatic" if is_auto_mode else "Manual"
+        mode_label = f"{self.MODES[parent_mode]} - {sub_mode} ({mode_type})"
         text = urwid.Text(f"{mode_label}\nPress 'q' to return to the selection menu.\n")
         filler = urwid.Filler(text, valign='top')
 
         def mode_handler(key):
             if key == 'q':
-                self.switch_mode(parent_mode)  # 返回橫向選單
+                self.clean_terminal()
+                self.switch_mode(parent_mode)  # Return to horizontal menu
             else:
-                self.auto_arm_mode(sub_mode, key)
+                if is_auto_mode:
+                    self.auto_arm_mode(self.sub_mode, key)
+                else:
+                    self.sub_mode = int(self.sub_mode)
+                    self.manual_arm_mode(self.sub_mode, key)
 
         self.loop.widget = filler
         self.loop.unhandled_input = mode_handler
-    
+
     def nav_mode_handler(self, parent_mode, sub_mode):
         """處理自動導航子模式"""
         mode_label = f"{self.MODES[parent_mode]} - {sub_mode}"
@@ -179,9 +185,18 @@ class ModeApp:
     def auto_arm_mode(self, sub_mode, key):
         """自動手臂模式"""
         if key == 'q':
+            self.clean_terminal()
             self.switch_mode('mode_auto_arm')  # 返回橫向選單
         else:
             print(f"Automatic Arm Mode - {sub_mode}: Pressed {key}")
+
+    def manual_arm_mode(self, sub_mode, key):
+        """手動手臂模式"""
+        if key == 'q':
+            self.clean_terminal()
+            self.switch_mode('mode_arm')  # 返回橫向選單
+        else:
+            self.arm_controller.manual_control(sub_mode, key)
         
     def auto_nav_mode(self, sub_mode, key):
         """自動手臂模式"""

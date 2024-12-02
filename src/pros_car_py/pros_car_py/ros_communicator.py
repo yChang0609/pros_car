@@ -89,6 +89,9 @@ class RosCommunicator(Node):
             String, "/target_label", 10
         )
 
+        self.crane_state_publisher = self.create_publisher(
+            String, 'crane_state', 10)
+
     # amcl_pose callback and get_latest_amcl_pose
     def subscriber_amcl_callback(self, msg):
         self.latest_amcl_pose = msg
@@ -215,6 +218,16 @@ class RosCommunicator(Node):
         target_label_msg = String()
         target_label_msg.data = label
         self.publisher_target_label.publish(target_label_msg)
+    
+    # 天車
+    def publish_crane_state(self, state):
+        control_signal = {
+            "type": "crane",
+            "data": dict(crane_state = state)
+        }
+        crane_state_msg = String()
+        crane_state_msg.data = orjson.dumps(control_signal).decode()
+        self.crane_state_publisher.publish(crane_state_msg)
 
     def yolo_detection_status_callback(self, msg):
         self.latest_yolo_detection_status = msg

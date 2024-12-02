@@ -10,30 +10,6 @@ import pybullet as p
 import numpy as np
 
 class ArmController():
-    """
-    A class to control a robotic arm.
-
-    This class provides methods to update joint positions, reset the arm, and publish the current arm position.
-    It handles individual and multiple joint updates with angle limits, and allows resetting the arm to default positions.
-
-    Attributes:
-        _init_joint_pos (list[float]): A list of initial joint angles (in radians).
-        joint_pos (list[float]): A list of current joint angles (in radians).
-        joint_trajectory_publisher_ (Publisher): ROS2 publisher for publishing the arm's joint trajectory.
-
-    Methods:
-        clamp(value, min_value, max_value):
-            Clamps a value between a minimum and maximum limit.
-        set_joint_position(joint_index, target_angle, lower_limit, upper_limit):
-            Sets a specific joint to a target angle with specified limits.
-        set_multiple_joint_positions(joint_positions):
-            Sets multiple joints to target angles with specified limits.
-        publish_arm_position():
-            Publishes the current joint angles of the robotic arm.
-        reset_arm():
-            Resets all joints of the robotic arm to their default positions.
-    """
-
     def __init__(self, ros_communicator, data_processor, ik_solver, num_joints = 4):
         # initail pybullet
         self.ik_solver = ik_solver
@@ -42,23 +18,19 @@ class ArmController():
         self.ros_communicator = ros_communicator
         self.data_processor = data_processor
         
-        self.num_joints = num_joints
-        self.joint_pos = []
+        self.num_joints = num_joints # 機械手臂角度
+        self.joint_pos = [] # 紀錄目前關節角度用
         self.key = 0
         
         self.world_created = False
         self.is_moving = False
         self.action_in_progress = False  # 動作進行中的標誌
-
-        self.x = 0
-        self.y = 0
-
         self.latest_align_coordinates = None
 
         self.base_link_position = self.ik_solver.get_base_position()
 
     def ensure_joint_pos_initialized(self):
-        if self.joint_pos is None or len(self.joint_pos) < self.num_joints:
+        if len(self.joint_pos) < self.num_joints:
             self.joint_pos = [0.0] * self.num_joints
             self.reset_arm(all_angle_degrees=90.0)
             self.update_action(self.joint_pos)
@@ -124,7 +96,6 @@ class ArmController():
                     self.move_to_position(mediapipe_coords)
                     self.publish_coordinates(mediapipe_coords[0], mediapipe_coords[1], mediapipe_coords[2])
 
-                    # self.human_like_wave(num_moves=1, steps=10)
                 elif mode=="auto_arm_grap":
                     self.ros_communicator.publish_target_label("fire")
                     self.set_last_joint_angle(70.0)
@@ -674,9 +645,12 @@ class ArmController():
         # 將每個角度設置到對應的關節
         for i, angle in enumerate(angles_degrees):
             self.joint_pos[i] = angle
-    
+    def get_joint_angles(self):
+        # Return the current joint angles in degrees
+        return [round(math.degrees(angle), 2) for angle in self.joint_pos]
     # 更新實體和虛擬
     def update_action(self, joint_pos):
+        print(f"update_action: {self.get_joint_angles()}")
         self.ik_solver.setJointPosition(joint_pos)
         self.ros_communicator.publish_robot_arm_angle(joint_pos)
         

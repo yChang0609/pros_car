@@ -2,10 +2,11 @@ import urwid
 import threading
 
 class ModeApp:
-    def __init__(self, car_controller, arm_controller, custom_control):
+    def __init__(self, car_controller, arm_controller, custom_control, crane_controller):
         self.MODES = {
             'mode_vehicle': "Control Vehicle",
             'mode_arm': "Control Robotic Arm",
+            'mode_crane': "Control Crane",
             'mode_auto_nav': ["manual_auto_nav", "target_auto_nav"],
             'mode_auto_arm': ["Arm Mode 1", "Arm Mode 2", "Arm Mode 3"],  # 橫向子模式
         }
@@ -15,6 +16,7 @@ class ModeApp:
         self.car_controller = car_controller
         self.arm_controller = arm_controller
         self.custom_control = custom_control
+        self.crane_controller = crane_controller
         self.loop = urwid.MainLoop(None, palette=self.palette)
 
     def main(self):
@@ -26,6 +28,7 @@ class ModeApp:
         menu_options = [
             (self.MODES['mode_vehicle'], lambda: self.switch_mode('mode_vehicle')),
             (self.MODES['mode_arm'], lambda: self.switch_mode('mode_arm')),
+            (self.MODES['mode_crane'], lambda: self.switch_mode('mode_crane')),
             ("Auto Navigation", lambda: self.switch_mode('mode_auto_nav')),
             ("Automatic Arm Mode", lambda: self.switch_mode('mode_auto_arm')),
             ('Exit', self.exit_program),
@@ -55,6 +58,11 @@ class ModeApp:
             self.horizontal_select(
                 ["0", "1", "2", "3", "4"],
                 lambda sub_mode: self.arm_mode_handler(mode_name, sub_mode, is_auto_mode=False)
+            )
+        elif mode_name == 'mode_crane':
+            self.horizontal_select(
+                ["0", "1", "2", "3", "4", "5", "6","99"],
+                lambda sub_mode: self.crane_mode_handler(mode_name, sub_mode, is_auto_mode=False)
             )
         else:
             mode_label = self.MODES.get(mode_name, "Unknown Mode")
@@ -122,6 +130,24 @@ class ModeApp:
         self.loop.widget = filler
         self.loop.unhandled_input = mode_handler
 
+    def crane_mode_handler(self, parent_mode, sub_mode, is_auto_mode=False):
+        """Handles both manual and automatic crane sub-modes."""
+        self.sub_mode = sub_mode
+        mode_type = "Automatic" if is_auto_mode else "Manual"
+        mode_label = f"{self.MODES[parent_mode]} - {sub_mode} ({mode_type})"
+        text = urwid.Text(f"{mode_label}\nPress 'q' to return to the selection menu.\n")
+        filler = urwid.Filler(text, valign='top')
+
+        def mode_handler(key):
+            if key == 'q':
+                self.clean_terminal()
+                self.switch_mode(parent_mode)  # Return to horizontal menu
+            else:
+                self.sub_mode = int(self.sub_mode)
+                self.manual_crane_mode(self.sub_mode, key)
+
+        self.loop.widget = filler
+        self.loop.unhandled_input = mode_handler
     def nav_mode_handler(self, parent_mode, sub_mode):
         """處理自動導航子模式"""
         mode_label = f"{self.MODES[parent_mode]} - {sub_mode}"
@@ -197,6 +223,14 @@ class ModeApp:
             self.switch_mode('mode_arm')  # 返回橫向選單
         else:
             self.arm_controller.manual_control(sub_mode, key)
+    
+    def manual_crane_mode(self, sub_mode, key):
+        """手動天車模式"""
+        if key == 'q':
+            self.clean_terminal()
+            self.switch_mode('mode_crane')  # 返回橫向選單
+        else:
+            self.crane_controller.manual_control(sub_mode, key)
         
     def auto_nav_mode(self, sub_mode, key):
         """自動手臂模式"""

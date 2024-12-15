@@ -13,6 +13,7 @@ import orjson
 from pros_car_py.ros_communicator_config import ACTION_MAPPINGS
 from geometry_msgs.msg import PointStamped
 from std_msgs.msg import String, Bool
+from std_msgs.msg import Float32MultiArray
 
 class RosCommunicator(Node):
     def __init__(self):
@@ -70,8 +71,8 @@ class RosCommunicator(Node):
         )
 
         # publish car_C_rear_wheel and car_C_front_wheel
-        self.publisher_rear = self.create_publisher(String, DeviceDataTypeEnum.car_C_rear_wheel, 10)
-        self.publisher_forward = self.create_publisher(String, DeviceDataTypeEnum.car_C_front_wheel, 10)
+        self.publisher_rear = self.create_publisher(Float32MultiArray, DeviceDataTypeEnum.car_C_rear_wheel, 10)
+        self.publisher_forward = self.create_publisher(Float32MultiArray, DeviceDataTypeEnum.car_C_front_wheel, 10)
 
         # publish goal_pose
         self.publisher_goal_pose = self.create_publisher(PoseStamped, "/goal_pose", 10)
@@ -130,34 +131,21 @@ class RosCommunicator(Node):
             self.get_logger().warn("No received global plan data received yet.")
             return None
         return self.latest_received_global_plan
-    
-    # publish car_C_rear_wheel and car_C_front_wheel
+
     def publish_car_control(self, action_key,publish_rear=True, publish_front=True):
+        msg = Float32MultiArray()
         if action_key not in ACTION_MAPPINGS:
-            self.get_logger().warn(f"Unknown action key: {action_key}")
+            print("action error")
             return
         velocities = ACTION_MAPPINGS[action_key]
         self._vel1, self._vel2, self._vel3, self._vel4 = velocities
-        if publish_rear:
-            control_signal_rear = {
-                "type": str(DeviceDataTypeEnum.car_C_rear_wheel),
-                "data": dict(CarCControl(target_vel=[self._vel1, self._vel2])),
-            }
-            control_msg_rear = String()
-            control_msg_rear.data = orjson.dumps(control_signal_rear).decode()
-            self.publisher_rear.publish(control_msg_rear)
-            # self.get_logger().info(f"Published to rear: {control_msg_rear}")
+        msg.data = [self._vel1, self._vel2]
+        if publish_rear == True:
+            self.publisher_rear.publish(msg)
+        msg.data = [self._vel3, self._vel4]
+        if publish_front == True:
+            self.publisher_forward.publish(msg)
 
-        if publish_front:
-            control_signal_front = {
-                "type": str(DeviceDataTypeEnum.car_C_front_wheel),
-                "data": dict(CarCControl(target_vel=[self._vel3, self._vel4])),
-            }
-            control_msg_front = String()
-            control_msg_front.data = orjson.dumps(control_signal_front).decode()
-            self.publisher_forward.publish(control_msg_front)
-            # self.get_logger().info(f"Published to front: {control_msg_front}")
-    
     # publish goal_pose
     def publish_goal_pose(self, goal_pose):
         goal_pose = PoseStamped()

@@ -5,8 +5,8 @@ class ModeApp:
     def __init__(self, car_controller, arm_controller, custom_control, crane_controller):
         self.MODES = {
             'mode_vehicle': "Control Vehicle",
-            'mode_arm': "Control Robotic Arm",
-            'mode_crane': "Control Crane",
+            'mode_arm': ["0", "1", "2", "3", "4"],
+            'mode_crane': ["0", "1", "2", "3", "4", "5", "6","99"],
             'mode_auto_nav': ["manual_auto_nav", "target_auto_nav"],
             'mode_auto_arm': ["Arm Mode 1", "Arm Mode 2", "Arm Mode 3"],  # 橫向子模式
         }
@@ -27,8 +27,8 @@ class ModeApp:
         """主選單"""
         menu_options = [
             (self.MODES['mode_vehicle'], lambda: self.switch_mode('mode_vehicle')),
-            (self.MODES['mode_arm'], lambda: self.switch_mode('mode_arm')),
-            (self.MODES['mode_crane'], lambda: self.switch_mode('mode_crane')),
+            ("Manual Arm control", lambda: self.switch_mode('mode_arm')),
+            ("Manual crane control", lambda: self.switch_mode('mode_crane')),
             ("Auto Navigation", lambda: self.switch_mode('mode_auto_nav')),
             ("Automatic Arm Mode", lambda: self.switch_mode('mode_auto_arm')),
             ('Exit', self.exit_program),
@@ -56,12 +56,12 @@ class ModeApp:
             )
         elif mode_name == 'mode_arm':
             self.horizontal_select(
-                ["0", "1", "2", "3", "4"],
+                self.MODES['mode_arm'],
                 lambda sub_mode: self.arm_mode_handler(mode_name, sub_mode, is_auto_mode=False)
             )
         elif mode_name == 'mode_crane':
             self.horizontal_select(
-                ["0", "1", "2", "3", "4", "5", "6","99"],
+                self.MODES['mode_crane'],
                 lambda sub_mode: self.crane_mode_handler(mode_name, sub_mode, is_auto_mode=False)
             )
         else:

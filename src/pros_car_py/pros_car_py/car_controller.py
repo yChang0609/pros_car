@@ -1,47 +1,23 @@
 from rclpy.node import Node
 from std_msgs.msg import String
 from pros_car_py.car_models import DeviceDataTypeEnum, CarCControl
-
+import threading
+import time
 
 class CarController():
-    """
-    A class to control the car.
-
-    This class provides methods to update wheel velocities and publish the control signals for the car's movement.
-    It handles different movements such as forward, backward, turning, and rotating the car, with the ability
-    to control rear and front wheels separately.
-
-    Attributes:
-        vel (float): Default velocity for the car's wheels.
-        _vel1 (float): Velocity for rear left wheel (rad/s).
-        _vel2 (float): Velocity for rear right wheel (rad/s).
-        _vel3 (float): Velocity for front left wheel (rad/s).
-        _vel4 (float): Velocity for front right wheel (rad/s).
-
-    Methods:
-        update_velocity(vel1, vel2, vel3, vel4):
-            Updates the velocity for each of the car's wheels.
-        publish_control(publish_rear=True, publish_front=True):
-            Publishes the control signals for the car's wheels.
-        move_forward(vel):
-            Moves the car forward by setting all wheels to the given velocity.
-        move_backward(vel):
-            Moves the car backward by setting all wheels to the negative of the given velocity.
-        turn_left(vel):
-            Turns the car left by reducing the velocity of the left wheels.
-        turn_right(vel):
-            Turns the car right by reducing the velocity of the right wheels.
-        rotate_cw(vel):
-            Rotates the car clockwise by setting opposite velocities for the left and right wheels.
-        rotate_ccw(vel):
-            Rotates the car counterclockwise by setting opposite velocities for the left and right wheels.
-        stop():
-            Stops the car by setting all wheels' velocities to zero.
-    """
 
     def __init__(self, ros_communicator, nav_processing):
         self.ros_communicator = ros_communicator
-        self.nav_processing = nav_processing        
+        self.nav_processing = nav_processing      
+        # 用來管理後台執行緒的屬性
+        self._auto_nav_thread = None
+        self._stop_event = None
+        self._thread_running = False
+        self.flag = 0
+
+        self._auto_nav_thread = None
+        self._stop_event = threading.Event()
+        self._thread_running = False
 
     def update_action(self, action_key):
         """
@@ -102,15 +78,49 @@ class CarController():
             key: 鍵盤輸入
         """
         # 如果有按鍵輸入
+        if self.flag == 0:
+            stop_event = threading.Event()
+            thread = threading.Thread(target=self.background_task, args=(stop_event,))
+
         if key == "q":
             # 按下 q 時停止導航並退出
+            if self._thread_running:
+                self._stop_event.set()
+                self._auto_nav_thread.join()
+                self._thread_running = False
+
             action_key = self.nav_processing.stop_nav()
             self.ros_communicator.publish_car_control(action_key, publish_rear=True, publish_front=True)
             return True
-        # 根據模式執行導航
-        else:
+        
+        if not self._thread_running:
+            self._stop_event.clear()  # 清除之前的停止狀態
+            self._auto_nav_thread = threading.Thread(
+                target=self.background_task,
+                args=(self._stop_event, mode, target),
+                daemon=True
+            )
+            self._auto_nav_thread.start()
+            self._thread_running = True
+
+        return False
+            
+    def background_task(self, stop_event, mode, target):
+        """
+        後台任務：不斷執行導航動作直到 stop_event 被設定。
+        """
+        while not stop_event.is_set():
             if mode == "manual_auto_nav":
                 action_key = self.nav_processing.get_action_from_nav2_plan(goal_coordinates=None)
             elif mode == "target_auto_nav":
                 action_key = self.nav_processing.get_action_from_nav2_plan(goal_coordinates=target)
+            
+            # 發布控制指令
             self.ros_communicator.publish_car_control(action_key, publish_rear=True, publish_front=True)
+            
+            # 模擬導航延遲
+            time.sleep(0.1)
+
+        # 收尾動作
+        print("[background_task] Navigation stopped.")
+

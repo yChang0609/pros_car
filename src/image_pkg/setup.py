@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "image_to_topic_node = image_pkg.image_to_topic:main",
+            "image_to_topic_node = image_pkg.image_to_topic_16bit:main",
+            "image_to_topic_node_8bit = image_pkg.image_to_topic_8bit:main",
         ],
     },
 )

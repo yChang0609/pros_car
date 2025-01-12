@@ -35,12 +35,22 @@ ACTION_MAPPINGS = {
         rotate_vel_median,
         -rotate_vel_median,
         rotate_vel_median,
-    ], # 中速左自轉
+    ],  # 中速左自轉
     "BACKWARD": [-vel, -vel, -vel, -vel],  # 後退
     "BACKWARD_SLOW": [-vel_slow, -vel_slow, -vel_slow, -vel_slow],  # 後退
     "CLOCKWISE_ROTATION": [rotate_vel, -rotate_vel, rotate_vel, -rotate_vel],  # 右自轉
-    "CLOCKWISE_ROTATION_SLOW": [rotate_vel_slow, -rotate_vel_slow, rotate_vel_slow, -rotate_vel_slow],  # 右慢自轉
-    "CLOCKWISE_ROTATION_MEDIAN": [rotate_vel_median, -rotate_vel_median, rotate_vel_median, -rotate_vel_median],  # 中右自轉
+    "CLOCKWISE_ROTATION_SLOW": [
+        rotate_vel_slow,
+        -rotate_vel_slow,
+        rotate_vel_slow,
+        -rotate_vel_slow,
+    ],  # 右慢自轉
+    "CLOCKWISE_ROTATION_MEDIAN": [
+        rotate_vel_median,
+        -rotate_vel_median,
+        rotate_vel_median,
+        -rotate_vel_median,
+    ],  # 中右自轉
     "RIGHT_FRONT": [rotate_vel * 1.2, rotate_vel, rotate_vel * 1.2, rotate_vel],  # 右前
     "RIGHT_SHIFT": [rotate_vel, -rotate_vel, -rotate_vel, rotate_vel],
     "LEFT_SHIFT": [-rotate_vel, rotate_vel, rotate_vel, -rotate_vel],

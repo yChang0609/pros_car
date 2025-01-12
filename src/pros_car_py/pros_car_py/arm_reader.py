@@ -28,9 +28,10 @@ class ArmSerialReader(Node):
     """
     A ROS2 node for reading serial data from an ESP32 device and publishing it as joint states.
 
-    This node establishes a serial connection with the ESP32 to receive joint angle data, converts the 
+    This node establishes a serial connection with the ESP32 to receive joint angle data, converts the
     angles from degrees to radians, and publishes the data as `JointState` messages to a ROS topic.
     """
+
     def __init__(self):
         """
         Initializes the ArmSerialReader node.
@@ -38,15 +39,17 @@ class ArmSerialReader(Node):
         Sets up the serial connection, the joint state publisher, a timer for periodic data reading, and
         logging intervals.
         """
-        super().__init__('arm_serial_reader')
+        super().__init__("arm_serial_reader")
 
         # Set up the serial connection
-        serial_port = self.declare_parameter('serial_port', ARM_SERIAL_PORT_DEFAULT).value
+        serial_port = self.declare_parameter(
+            "serial_port", ARM_SERIAL_PORT_DEFAULT
+        ).value
         self._serial = Serial(serial_port, 115200, timeout=0)
 
         # Create a publisher for the serial data
         # TODO dynamic to adjust arm
-        self._publisher = self.create_publisher(JointState, 'joint_states', 10)
+        self._publisher = self.create_publisher(JointState, "joint_states", 10)
         timer_period = 0.1  # seconds
         self._timer = self.create_timer(0.1, self.reader_callback)
         self._joint_names = ["joint1", "joint2", "joint3", "joint4", "joint5"]
@@ -62,8 +65,8 @@ class ArmSerialReader(Node):
         """
         Callback function for reading serial data and publishing joint states.
 
-        Reads data from the ESP32 via the serial connection, decodes the JSON data, converts the joint angles 
-        from degrees to radians, and publishes the joint states as a `JointState` message. Errors during 
+        Reads data from the ESP32 via the serial connection, decodes the JSON data, converts the joint angles
+        from degrees to radians, and publishes the joint states as a `JointState` message. Errors during
         reading or parsing are logged.
         """
         # Read data from the serial device
@@ -71,7 +74,9 @@ class ArmSerialReader(Node):
         try:
             # esp32_json_str = data.decode('utf-8')
             degree_data = orjson.loads(data)
-            degree_positions = degree_data["servo_current_angles"]  # Assuming this is the key in your JSON
+            degree_positions = degree_data[
+                "servo_current_angles"
+            ]  # Assuming this is the key in your JSON
 
         except orjson.JSONDecodeError as error:
             self.get_logger().error(f"Json decode error when recv {data}")
@@ -99,7 +104,7 @@ class ArmSerialReader(Node):
         self._publisher.publish(msg)
         current_time = self.get_clock().now()
         if current_time - self.last_log_time >= self.log_interval:
-            self.get_logger().info(f'Receive from arm esp32: {degree_data}')
+            self.get_logger().info(f"Receive from arm esp32: {degree_data}")
             self.last_log_time = current_time
 
 
@@ -119,5 +124,5 @@ def main(args=None):
     rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

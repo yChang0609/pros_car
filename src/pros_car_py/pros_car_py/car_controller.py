@@ -4,11 +4,12 @@ from pros_car_py.car_models import DeviceDataTypeEnum, CarCControl
 import threading
 import time
 
-class CarController():
+
+class CarController:
 
     def __init__(self, ros_communicator, nav_processing):
         self.ros_communicator = ros_communicator
-        self.nav_processing = nav_processing      
+        self.nav_processing = nav_processing
         # 用來管理後台執行緒的屬性
         self._auto_nav_thread = None
         self._stop_event = None
@@ -49,21 +50,21 @@ class CarController():
         Example:
             car_controller.manual_control('w')  # Moves the car forward.
         """
-        if key == 'w':
+        if key == "w":
             self.update_action("FORWARD")
-        elif key == 's':
+        elif key == "s":
             self.update_action("BACKWARD")
-        elif key == 'a':
+        elif key == "a":
             self.update_action("LEFT_FRONT")
-        elif key == 'd':
+        elif key == "d":
             self.update_action("RIGHT_FRONT")
-        elif key == 'e':
+        elif key == "e":
             self.update_action("COUNTERCLOCKWISE_ROTATION")
-        elif key == 'r':
+        elif key == "r":
             self.update_action("CLOCKWISE_ROTATION")
-        elif key == 'z':
+        elif key == "z":
             self.update_action("STOP")
-        elif key == 'q':
+        elif key == "q":
             self.update_action("STOP")
             return True
         else:
@@ -90,37 +91,47 @@ class CarController():
                 self._thread_running = False
 
             action_key = self.nav_processing.stop_nav()
-            self.ros_communicator.publish_car_control(action_key, publish_rear=True, publish_front=True)
+            self.ros_communicator.publish_car_control(
+                action_key, publish_rear=True, publish_front=True
+            )
             return True
-        
+
         if not self._thread_running:
             self._stop_event.clear()  # 清除之前的停止狀態
             self._auto_nav_thread = threading.Thread(
                 target=self.background_task,
                 args=(self._stop_event, mode, target),
-                daemon=True
+                daemon=True,
             )
             self._auto_nav_thread.start()
             self._thread_running = True
 
         return False
-            
+
     def background_task(self, stop_event, mode, target):
         """
         後台任務：不斷執行導航動作直到 stop_event 被設定。
         """
         while not stop_event.is_set():
             if mode == "manual_auto_nav":
-                action_key = self.nav_processing.get_action_from_nav2_plan(goal_coordinates=None)
+                action_key = self.nav_processing.get_action_from_nav2_plan(
+                    goal_coordinates=None
+                )
             elif mode == "target_auto_nav":
-                action_key = self.nav_processing.get_action_from_nav2_plan(goal_coordinates=target)
-            
+                action_key = self.nav_processing.get_action_from_nav2_plan(
+                    goal_coordinates=target
+                )
+            print(action_key)
             # 發布控制指令
-            self.ros_communicator.publish_car_control(action_key, publish_rear=True, publish_front=True)
-            
+            self.ros_communicator.publish_car_control(
+                action_key, publish_rear=True, publish_front=True
+            )
+
             # 模擬導航延遲
             time.sleep(0.1)
 
         # 收尾動作
         print("[background_task] Navigation stopped.")
 
+    def run(self, mode, target):
+        pass

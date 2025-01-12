@@ -1,10 +1,6 @@
 from rclpy.node import Node
 from pros_car_py.car_models import DeviceDataTypeEnum, CarCControl
-from geometry_msgs.msg import (
-    PoseWithCovarianceStamped,
-    PoseStamped,
-    Point
-)
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, Point
 from std_msgs.msg import String, Header
 from nav_msgs.msg import Path
 from sensor_msgs.msg import LaserScan, Imu
@@ -14,6 +10,7 @@ from pros_car_py.ros_communicator_config import ACTION_MAPPINGS
 from geometry_msgs.msg import PointStamped
 from std_msgs.msg import String, Bool
 from std_msgs.msg import Float32MultiArray
+
 
 class RosCommunicator(Node):
     def __init__(self):
@@ -30,7 +27,7 @@ class RosCommunicator(Node):
         self.subscriber_goal = self.create_subscription(
             PoseStamped, "/goal_pose", self.subscriber_goal_callback, 1
         )
-        
+
         # subscribe lidar
         self.latest_lidar = None
         self.subscriber_lidar = self.create_subscription(
@@ -46,13 +43,19 @@ class RosCommunicator(Node):
         # Subscribe to YOLO detected object coordinates
         self.latest_yolo_coordinates = None
         self.subscriber_yolo_detection_position = self.create_subscription(
-            PointStamped, "/yolo/detection/position", self.yolo_detection_position_callback, 10
+            PointStamped,
+            "/yolo/detection/position",
+            self.yolo_detection_position_callback,
+            10,
         )
 
         # Subscribe to YOLO detected object coordinates
         self.latest_yolo_offset = None
         self.subscriber_yolo_offset = self.create_subscription(
-            PointStamped, "/yolo/detection/offset", self.yolo_detection_offset_callback, 10
+            PointStamped,
+            "/yolo/detection/offset",
+            self.yolo_detection_offset_callback,
+            10,
         )
 
         self.latest_yolo_detection_status = None
@@ -62,17 +65,21 @@ class RosCommunicator(Node):
 
         self.latest_imu_data = None
         self.imu_sub = self.create_subscription(
-            Imu,'/imu/data',self.imu_data_callback,10
+            Imu, "/imu/data", self.imu_data_callback, 10
         )
 
         self.latest_mediapipe_data = None
         self.mediapipe_sub = self.create_subscription(
-            Point,'/mediapipe_data',self.mediapipe_data_callback,10
+            Point, "/mediapipe_data", self.mediapipe_data_callback, 10
         )
 
         # publish car_C_rear_wheel and car_C_front_wheel
-        self.publisher_rear = self.create_publisher(Float32MultiArray, DeviceDataTypeEnum.car_C_rear_wheel, 10)
-        self.publisher_forward = self.create_publisher(Float32MultiArray, DeviceDataTypeEnum.car_C_front_wheel, 10)
+        self.publisher_rear = self.create_publisher(
+            Float32MultiArray, DeviceDataTypeEnum.car_C_rear_wheel, 10
+        )
+        self.publisher_forward = self.create_publisher(
+            Float32MultiArray, DeviceDataTypeEnum.car_C_front_wheel, 10
+        )
 
         # publish goal_pose
         self.publisher_goal_pose = self.create_publisher(PoseStamped, "/goal_pose", 10)
@@ -86,12 +93,9 @@ class RosCommunicator(Node):
             PointStamped, "/coordinates", 10
         )
 
-        self.publisher_target_label = self.create_publisher(
-            String, "/target_label", 10
-        )
+        self.publisher_target_label = self.create_publisher(String, "/target_label", 10)
 
-        self.crane_state_publisher = self.create_publisher(
-            String, 'crane_state', 10)
+        self.crane_state_publisher = self.create_publisher(String, "crane_state", 10)
 
     # amcl_pose callback and get_latest_amcl_pose
     def subscriber_amcl_callback(self, msg):
@@ -107,12 +111,12 @@ class RosCommunicator(Node):
         position = msg.pose.position
         target = [position.x, position.y, position.z]
         self.target_pose = target
-    
+
     def get_latest_goal(self):
         if self.target_pose is None:
             self.get_logger().warn("No goal pose data received yet.")
         return self.target_pose
-    
+
     # lidar callback and get_latest_lidar
     def subscriber_lidar_callback(self, msg):
         self.latest_lidar = msg
@@ -121,7 +125,7 @@ class RosCommunicator(Node):
         if self.latest_lidar is None:
             self.get_logger().warn("No Lidar data received yet.")
         return self.latest_lidar
-    
+
     # received_global_plan callback and get_latest_received_global_plan
     def received_global_plan_callback(self, msg):
         self.latest_received_global_plan = msg
@@ -132,7 +136,7 @@ class RosCommunicator(Node):
             return None
         return self.latest_received_global_plan
 
-    def publish_car_control(self, action_key,publish_rear=True, publish_front=True):
+    def publish_car_control(self, action_key, publish_rear=True, publish_front=True):
         msg = Float32MultiArray()
         if action_key not in ACTION_MAPPINGS:
             print("action error")
@@ -157,14 +161,14 @@ class RosCommunicator(Node):
         goal_pose.pose.position.z = 0.0
         goal_pose.pose.orientation.w = 1.0
         self.publisher_goal_pose.publish(goal_pose)
-    
+
     # publish robot arm angle
     def publish_robot_arm_angle(self, angle):
         joint_trajectory_point = JointTrajectoryPoint()
         joint_trajectory_point.positions = angle
         joint_trajectory_point.velocities = [0.0] * len(angle)
         self.publisher_joint_trajectory.publish(joint_trajectory_point)
-    
+
     def publish_coordinates(self, x, y, z, frame_id="map"):
         coordinate_msg = PointStamped()
         coordinate_msg.header.stamp = self.get_clock().now().to_msg()
@@ -173,58 +177,55 @@ class RosCommunicator(Node):
         coordinate_msg.point.y = y
         coordinate_msg.point.z = z
         self.publisher_coordinates.publish(coordinate_msg)
-    
+
     def mediapipe_data_callback(self, msg):
         self.latest_mediapipe_data = msg
-    
+
     def get_latest_mediapipe_data(self):
         if self.latest_mediapipe_data is None:
             self.get_logger().warn("No Mediapipe data received yet.")
             return None
         return self.latest_mediapipe_data
-    
+
     # YOLO coordinates callback
     def yolo_detection_position_callback(self, msg):
         """Callback to receive YOLO detected object coordinates."""
         self.latest_yolo_coordinates = msg
-    
+
     def get_latest_yolo_detection_position(self):
         """Getter for the latest YOLO detected object coordinates."""
         if self.latest_yolo_coordinates is None:
             return None
         return self.latest_yolo_coordinates
-    
+
     def yolo_detection_offset_callback(self, msg):
         self.latest_yolo_offset = msg
-    
+
     def get_latest_yolo_detection_offset(self):
         if self.latest_yolo_offset is None:
             return None
         return self.latest_yolo_offset
-    
+
     def publish_target_label(self, label):
         target_label_msg = String()
         target_label_msg.data = label
         self.publisher_target_label.publish(target_label_msg)
-    
+
     # 天車
     def publish_crane_state(self, state):
-        control_signal = {
-            "type": "crane",
-            "data": dict(crane_state = state)
-        }
+        control_signal = {"type": "crane", "data": dict(crane_state=state)}
         crane_state_msg = String()
         crane_state_msg.data = orjson.dumps(control_signal).decode()
         self.crane_state_publisher.publish(crane_state_msg)
 
     def yolo_detection_status_callback(self, msg):
         self.latest_yolo_detection_status = msg
-    
+
     def get_latest_yolo_detection_status(self):
         if self.latest_yolo_detection_status is None:
             return None
         return self.latest_yolo_detection_status
-    
+
     def imu_data_callback(self, msg):
         self.latest_imu_data = msg
 
@@ -232,5 +233,3 @@ class RosCommunicator(Node):
         if self.latest_imu_data is None:
             return None
         return self.latest_imu_data
-    
-    

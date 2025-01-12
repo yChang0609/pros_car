@@ -16,6 +16,7 @@ from pros_car_py.custom_control import CustomControl
 from pros_car_py.ik_solver import PybulletRobotController
 from pros_car_py.mode_app import ModeApp
 
+
 def init_ros_node():
     rclpy.init()
     node = RosCommunicator()
@@ -23,14 +24,19 @@ def init_ros_node():
     thread.start()
     return node, thread
 
+
 def main():
     ros_communicator, ros_thread = init_ros_node()
     data_processor = DataProcessor(ros_communicator)
     nav2_processing = Nav2Processing(ros_communicator, data_processor)
     ik_solver = PybulletRobotController(end_eff_index=5)
     car_controller = CarController(ros_communicator, nav2_processing)
-    arm_controller = ArmController(ros_communicator, data_processor, ik_solver, num_joints=5)
-    crane_controller = CraneController(ros_communicator, data_processor, ik_solver, num_joints=7)
+    arm_controller = ArmController(
+        ros_communicator, data_processor, ik_solver, num_joints=5
+    )
+    crane_controller = CraneController(
+        ros_communicator, data_processor, ik_solver, num_joints=7
+    )
     custom_control = CustomControl(car_controller, arm_controller)
     app = ModeApp(car_controller, arm_controller, custom_control, crane_controller)
 
@@ -40,5 +46,6 @@ def main():
         rclpy.shutdown()
         ros_thread.join()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

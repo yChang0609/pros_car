@@ -7,16 +7,29 @@ if [ "$1" = "--port" ] && [ -n "$2" ] && [ -n "$3" ]; then
     shift 3  # Remove the first three arguments
 fi
 
-# # gpu check
-# if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
-#     echo "NVIDIA GPU detected"
-#     GPU_FLAGS="--runtime nvidia --gpus all"
-# else
-#     echo "No NVIDIA GPU detected or NVIDIA drivers not installed"
-#     GPU_FLAGS=""
-# fi
+# 檢查操作系統並初始化 GPU 標誌
+GPU_FLAGS=""
+OS_TYPE=$(uname -s)
 
-# 初始化device參數
+if [ "$OS_TYPE" = "Linux" ]; then
+    # 如果是 Jetson 平台，使用 --runtime nvidia
+    if [ -f "/etc/nv_tegra_release" ]; then
+        GPU_FLAGS="--runtime nvidia"
+    else
+        GPU_FLAGS="--gpus all"
+    fi
+elif [ "$OS_TYPE" = "Darwin" ]; then
+    # macOS 平台不需要 GPU 標誌
+    GPU_FLAGS=""
+else
+    # 默認假設是 Windows WSL 或其他 Linux 平台
+    GPU_FLAGS="--gpus all"
+fi
+
+echo "Detected OS: $OS_TYPE"
+echo "GPU Flags: $GPU_FLAGS"
+
+# 初始化 device 參數
 device_options=""
 
 # 檢查設備動態加入
@@ -35,12 +48,10 @@ fi
 # run docker container
 docker run -it --rm \
     -v "$(pwd)/src:/workspaces/src" \
-    -e DISPLAY=$DISPLAY \
-    -v /tmp/.X11-unix:/tmp/.X11-unix \
     --network compose_my_bridge_network \
     --env-file ./.env \
     $PORT_MAPPING \
-    --runtime nvidia \
+    $GPU_FLAGS \
     $device_options \
-    ghcr.io/otischung/pros_ai_image_pros_car:latest \
+    registry.screamtrumpet.csie.ncku.edu.tw/pros_images/pros_jetson_driver_image_pros_car:latest \
     /bin/bash

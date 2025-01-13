@@ -53,5 +53,5 @@ docker run -it --rm \
     $PORT_MAPPING \
     $GPU_FLAGS \
     $device_options \
-    registry.screamtrumpet.csie.ncku.edu.tw/pros_images/pros_jetson_driver_image_pros_car:latest \
+    registry.screamtrumpet.csie.ncku.edu.tw/alianlbj23/pros_car_docker_image:latest \
     /bin/bash

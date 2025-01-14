@@ -1,6 +1,35 @@
 #!/bin/bash
 
-# 初始化device參數
+# Port mapping check
+PORT_MAPPING=""
+if [ "$1" = "--port" ] && [ -n "$2" ] && [ -n "$3" ]; then
+    PORT_MAPPING="-p $2:$3"
+    shift 3  # Remove the first three arguments
+fi
+
+# 檢查操作系統並初始化 GPU 標誌
+GPU_FLAGS=""
+OS_TYPE=$(uname -s)
+
+if [ "$OS_TYPE" = "Linux" ]; then
+    # 如果是 Jetson 平台，使用 --runtime nvidia
+    if [ -f "/etc/nv_tegra_release" ]; then
+        GPU_FLAGS="--runtime nvidia"
+    else
+        GPU_FLAGS="--gpus all"
+    fi
+elif [ "$OS_TYPE" = "Darwin" ]; then
+    # macOS 平台不需要 GPU 標誌
+    GPU_FLAGS=""
+else
+    # 默認假設是 Windows WSL 或其他 Linux 平台
+    GPU_FLAGS="--gpus all"
+fi
+
+echo "Detected OS: $OS_TYPE"
+echo "GPU Flags: $GPU_FLAGS"
+
+# 初始化 device 參數
 device_options=""
 
 # 檢查設備動態加入
@@ -32,11 +61,13 @@ if [ -e /dev/bus/usb ]; then
     device_options+=" --device=/dev/bus/usb"
 fi
 
-# 建構完整指令
+# run docker container
 docker run -it --rm \
     -v "$(pwd)/src:/workspaces/src" \
-    --network scripts_my_bridge_network \
-    $device_options \
+    --network compose_my_bridge_network \
     --env-file ./.env \
-    ghcr.io/otischung/pros_ai_image:latest \
+    $PORT_MAPPING \
+    $GPU_FLAGS \
+    $device_options \
+    registry.screamtrumpet.csie.ncku.edu.tw/alianlbj23/pros_car_docker_image:latest \
     /bin/bash

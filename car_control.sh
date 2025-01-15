@@ -12,6 +12,7 @@ GPU_FLAGS=""
 OS_TYPE=$(uname -s)
 
 if [ "$OS_TYPE" = "Linux" ]; then
+    # Check for NVIDIA runtime
     if [ -f "/etc/nv_tegra_release" ]; then
         GPU_FLAGS="--runtime nvidia"
     elif docker info --format '{{json .}}' | grep -q '"Runtimes".*nvidia'; then
@@ -19,10 +20,13 @@ if [ "$OS_TYPE" = "Linux" ]; then
     fi
 fi
 
-# Check if GPU support is available
+# Verify GPU support with nvidia-container-cli
+USE_GPU=false
 if [ -n "$GPU_FLAGS" ]; then
-    if ! docker info --format '{{json .}}' | grep -q '"nvidia"'; then
-        echo "Warning: GPU support is not available. Removing GPU flags."
+    if nvidia-container-cli info > /dev/null 2>&1; then
+        USE_GPU=true
+    else
+        echo "Warning: GPU support detected but not usable. Skipping GPU configuration."
         GPU_FLAGS=""
     fi
 fi
@@ -46,13 +50,26 @@ if [ -e /dev/usb_robot_arm ]; then
     device_options+=" --device=/dev/usb_robot_arm"
 fi
 
-# Run docker container
-docker run -it --rm \
-    -v "$(pwd)/src:/workspaces/src" \
-    --network compose_my_bridge_network \
-    --env-file ./.env \
-    $PORT_MAPPING \
-    $GPU_FLAGS \
-    $device_options \
-    registry.screamtrumpet.csie.ncku.edu.tw/alianlbj23/pros_car_docker_image:latest \
-    /bin/bash
+# Run docker container based on GPU support
+if [ "$USE_GPU" = true ]; then
+    echo "Running Docker container with GPU support..."
+    docker run -it --rm \
+        -v "$(pwd)/src:/workspaces/src" \
+        --network compose_my_bridge_network \
+        --env-file ./.env \
+        $PORT_MAPPING \
+        $GPU_FLAGS \
+        $device_options \
+        registry.screamtrumpet.csie.ncku.edu.tw/alianlbj23/pros_car_docker_image:latest \
+        /bin/bash
+else
+    echo "Running Docker container without GPU support..."
+    docker run -it --rm \
+        -v "$(pwd)/src:/workspaces/src" \
+        --network compose_my_bridge_network \
+        --env-file ./.env \
+        $PORT_MAPPING \
+        $device_options \
+        registry.screamtrumpet.csie.ncku.edu.tw/alianlbj23/pros_car_docker_image:latest \
+        /bin/bash
+fi

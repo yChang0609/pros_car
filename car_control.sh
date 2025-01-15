@@ -50,7 +50,23 @@ if [ -e /dev/usb_robot_arm ]; then
     device_options+=" --device=/dev/usb_robot_arm"
 fi
 
-# Run docker container
+if [ -e /dev/video0 ]; then
+    device_options+=" --device=/dev/video0"
+fi
+
+if [ -e /dev/video1 ]; then
+    device_options+=" --device=/dev/video1"
+fi
+
+if [ -e /dev/imu_usb ]; then
+    device_options+=" --device=/dev/imu_usb"
+fi
+
+if [ -e /dev/bus/usb ]; then
+    device_options+=" --device=/dev/bus/usb"
+fi
+
+# run docker container
 docker run -it --rm \
     -v "$(pwd)/src:/workspaces/src" \
     --network compose_my_bridge_network \

@@ -14,18 +14,14 @@ OS_TYPE=$(uname -s)
 if [ "$OS_TYPE" = "Linux" ]; then
     if [ -f "/etc/nv_tegra_release" ]; then
         GPU_FLAGS="--runtime nvidia"
-    else
+    elif docker info --format '{{json .}}' | grep -q '"Runtimes".*nvidia'; then
         GPU_FLAGS="--gpus all"
     fi
-elif [ "$OS_TYPE" = "Darwin" ]; then
-    GPU_FLAGS=""
-else
-    GPU_FLAGS="--gpus all"
 fi
 
 # Check if GPU support is available
 if [ -n "$GPU_FLAGS" ]; then
-    if ! docker info --format '{{json .}}' | grep -q '"Runtimes".*nvidia'; then
+    if ! docker info --format '{{json .}}' | grep -q '"nvidia"'; then
         echo "Warning: GPU support is not available. Removing GPU flags."
         GPU_FLAGS=""
     fi

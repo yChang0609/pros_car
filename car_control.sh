@@ -50,6 +50,21 @@ if [ -e /dev/usb_robot_arm ]; then
     device_options+=" --device=/dev/usb_robot_arm"
 fi
 
+# Function to test if Docker can run with GPU
+test_gpu_flags() {
+    docker run --rm $GPU_FLAGS registry.screamtrumpet.csie.ncku.edu.tw/alianlbj23/pros_car_docker_image:latest /bin/bash -c "echo GPU test" > /dev/null 2>&1
+}
+
+# Check if GPU flags cause an error
+if [ "$USE_GPU" = true ]; then
+    echo "Testing Docker run with GPU flags..."
+    if ! test_gpu_flags; then
+        echo "Error: Running Docker with GPU flags failed. Disabling GPU flags."
+        GPU_FLAGS=""
+        USE_GPU=false
+    fi
+fi
+
 # Run docker container based on GPU support
 if [ "$USE_GPU" = true ]; then
     echo "Running Docker container with GPU support..."

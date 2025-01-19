@@ -29,7 +29,7 @@ fi
 # 測試 GPU 是否可用
 if [ "$USE_GPU" = true ]; then
     echo "Testing Docker run with GPU..."
-    docker run --rm $GPU_FLAGS registry.screamtrumpet.csie.ncku.edu.tw/alianlbj23/pros_car_docker_image:latest /bin/bash -c "echo GPU test" > /dev/null 2>&1
+    docker run --rm $GPU_FLAGS ghcr.io/screamlab/pros_car_docker_image:latest /bin/bash -c "echo GPU test" > /dev/null 2>&1
     if [ $? -ne 0 ]; then
         echo "GPU not supported or failed, disabling GPU flags."
         GPU_FLAGS=""
@@ -63,7 +63,7 @@ if [ "$ARCH" = "aarch64" ]; then
         --runtime=nvidia \
         --env-file .env \
         -v "$(pwd)/src:/workspace/src" \
-        registry.screamtrumpet.csie.ncku.edu.tw/screamlab/jpack5_yolo_opencv_image:latest \
+        ghcr.io/screamlab/pros_car_docker_image:latest \
         /bin/bash
 
 elif [ "$ARCH" = "x86_64" ] || ([ "$ARCH" = "arm64" ] && [ "$OS" = "Darwin" ]); then
@@ -77,7 +77,7 @@ elif [ "$ARCH" = "x86_64" ] || ([ "$ARCH" = "arm64" ] && [ "$OS" = "Darwin" ]); 
             --env-file .env \
             -v "$(pwd)/src:/workspaces/src" \
             -v "$(pwd)/screenshots:/workspaces/screenshots" \
-            registry.screamtrumpet.csie.ncku.edu.tw/screamlab/pros_cameraapi:0.0.2 \
+            ghcr.io/screamlab/pros_car_docker_image:latest \
             /bin/bash
     else
         echo "Trying to run with GPU support..."
@@ -88,7 +88,7 @@ elif [ "$ARCH" = "x86_64" ] || ([ "$ARCH" = "arm64" ] && [ "$OS" = "Darwin" ]); 
             --env-file .env \
             -v "$(pwd)/src:/workspaces/src" \
             -v "$(pwd)/screenshots:/workspaces/screenshots" \
-            registry.screamtrumpet.csie.ncku.edu.tw/screamlab/pros_cameraapi:0.0.2 \
+            ghcr.io/screamlab/pros_car_docker_image:latest \
             /bin/bash
 
         # 如果 GPU 啟動失敗，回退到 CPU 模式
@@ -100,7 +100,7 @@ elif [ "$ARCH" = "x86_64" ] || ([ "$ARCH" = "arm64" ] && [ "$OS" = "Darwin" ]); 
                 --env-file .env \
                 -v "$(pwd)/src:/workspaces/src" \
                 -v "$(pwd)/screenshots:/workspaces/screenshots" \
-                registry.screamtrumpet.csie.ncku.edu.tw/screamlab/pros_cameraapi:0.0.2 \
+                ghcr.io/screamlab/pros_car_docker_image:latest \
                 /bin/bash
         fi
     fi

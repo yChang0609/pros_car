@@ -62,7 +62,7 @@ if [ "$ARCH" = "aarch64" ]; then
         $PORT_MAPPING \
         --runtime=nvidia \
         --env-file .env \
-        -v "$(pwd)/src:/workspace/src" \
+        -v "$(pwd)/src:/workspaces/src" \
         ghcr.io/screamlab/pros_car_docker_image:latest \
         /bin/bash
 

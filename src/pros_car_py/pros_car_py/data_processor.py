@@ -9,6 +9,7 @@ FRONT_LIDAR_INDICES = list(range(0, 16)) + list(range(-15, 0))  # front lidar in
 LEFT_LIDAR_INDICES = list(range(16, 46))  # left lidar indices
 RIGHT_LIDAR_INDICES = list(range(-45, -15))  # right lidar indices
 
+
 class DataProcessor:
     def __init__(self, ros_communicator):
         self.ros_communicator = ros_communicator
@@ -131,6 +132,27 @@ class DataProcessor:
         received_global_plan_msg = (
             self.ros_communicator.get_latest_received_global_plan()
         )
-        if received_global_plan_msg is None:
-            return None, None
-        return received_global_plan_msg
+
+        if not received_global_plan_msg or not received_global_plan_msg.poses:
+            print("沒接收到路徑")
+            return None
+
+        goal_position = self.ros_communicator.get_latest_goal()
+        if goal_position is None:
+            print("未設定 goal_pose")
+            return None
+
+        last_point = received_global_plan_msg.poses[-1].pose.position
+        last_x, last_y = last_point.x, last_point.y
+        goal_x, goal_y = goal_position[:2]
+
+        distance_to_goal = math.sqrt((last_x - goal_x) ** 2 + (last_y - goal_y) ** 2)
+
+        # 如果該條路徑的末端有靠近終點就當成是成功的路徑
+        if distance_to_goal < 0.2:
+            self.ros_communicator.publish_confirmed_initial_plan(
+                received_global_plan_msg
+            )
+            return received_global_plan_msg
+        else:
+            return None

@@ -3,6 +3,7 @@ from typing import Tuple
 import numpy as np
 from math import atan2, degrees
 import math
+
 """
 Calculate wheel speeds based on the given command velocity.
 
@@ -16,8 +17,6 @@ Example :
     car_data = self.node.wait_for_data()
     self.pwm_left, self.pwm_right = self.calculate_wheel_speeds(car_data["navigation_data"])
 """
-
-
 
 
 def get_yaw_from_quaternion(z, w):
@@ -75,12 +74,10 @@ def calculate_angle_to_target(vehicle_pos, target_pos, vehicle_orientation):
 
     return degrees(angle_difference)
 
+
 def round_to_decimal_places(data_list, decimal_places=3):
     return [round(num, decimal_places) for num in data_list]
 
+
 def cal_distance(car_pos, target_pos):
-    car_target_distance = (car_pos[0] - target_pos[0]) ** 2 + (
-        car_pos[1] - target_pos[1]
-    ) ** 2
-    car_target_distance = round_to_decimal_places([math.sqrt(car_target_distance)])[0]
-    return car_target_distance
+    return math.hypot(car_pos[0] - target_pos[0], car_pos[1] - target_pos[1])

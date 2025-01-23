@@ -10,6 +10,11 @@ from pros_car_py.ros_communicator_config import ACTION_MAPPINGS
 from geometry_msgs.msg import PointStamped
 from std_msgs.msg import String, Bool
 from std_msgs.msg import Float32MultiArray
+from visualization_msgs.msg import Marker
+from nav2_msgs.srv import ClearEntireCostmap
+from rclpy.action import ActionClient
+from nav2_msgs.action import NavigateToPose
+import rclpy
 
 
 class RosCommunicator(Node):
@@ -97,6 +102,64 @@ class RosCommunicator(Node):
 
         self.crane_state_publisher = self.create_publisher(String, "crane_state", 10)
 
+        self.publisher_confirmed_path = self.create_publisher(
+            Path, "/confirmed_initial_plan", 10
+        )
+
+        self.publisher_target_marker = self.create_publisher(
+            Marker, "/selected_target_marker", 10
+        )
+
+        # 創清除 costmap Service
+        self.clear_global_costmap_client = self.create_client(
+            ClearEntireCostmap, "/global_costmap/clear"
+        )
+        self.clear_local_costmap_client = self.create_client(
+            ClearEntireCostmap, "/local_costmap/clear"
+        )
+
+        self.publisher_received_global_plan = self.create_publisher(
+            Path, "/received_global_plan", 10
+        )
+        self.publisher_plan = self.create_publisher(Path, "/plan", 10)
+
+        self.clear_global_costmap_client = self.create_client(
+            ClearEntireCostmap, "/global_costmap/clear"
+        )
+        self.clear_local_costmap_client = self.create_client(
+            ClearEntireCostmap, "/local_costmap/clear"
+        )
+
+        self.navigate_to_pose_action_client = ActionClient(
+            self, NavigateToPose, "/navigate_to_pose"
+        )
+
+    def clear_received_global_plan(self):
+        """
+        清空 /received_global_plan 话题
+        """
+        empty_path = Path()
+        empty_path.header.frame_id = "map"
+        self.publisher_received_global_plan.publish(empty_path)
+        self.get_logger().info("Published empty Path to /received_global_plan")
+
+    def clear_plan(self):
+        """
+        清空 /plan 话题
+        """
+        empty_path = Path()
+        empty_path.header.frame_id = "map"
+        self.publisher_plan.publish(empty_path)
+        self.get_logger().info("Published empty Path to /plan")
+
+    def reset_nav2(self):
+        """
+        clear plan
+        """
+        self.clear_received_global_plan()
+        self.clear_plan()
+        self.get_logger().info("Nav2 Reset Completed")
+
     # amcl_pose callback and get_latest_amcl_pose
     def subscriber_amcl_callback(self, msg):
         self.latest_amcl_pose = msg
@@ -139,7 +202,7 @@ class RosCommunicator(Node):
     def publish_car_control(self, action_key, publish_rear=True, publish_front=True):
         msg = Float32MultiArray()
         if action_key not in ACTION_MAPPINGS:
-            print("action error")
+            # print("action error")
             return
         velocities = ACTION_MAPPINGS[action_key]
         self._vel1, self._vel2, self._vel3, self._vel4 = velocities
@@ -151,13 +214,13 @@ class RosCommunicator(Node):
             self.publisher_forward.publish(msg)
 
     # publish goal_pose
-    def publish_goal_pose(self, goal_pose):
+    def publish_goal_pose(self, goal):
         goal_pose = PoseStamped()
         goal_pose.header = Header()
         goal_pose.header.stamp = self.get_clock().now().to_msg()
         goal_pose.header.frame_id = "map"
-        goal_pose.pose.position.x = goal_pose[0]
-        goal_pose.pose.position.y = goal_pose[1]
+        goal_pose.pose.position.x = goal[0]
+        goal_pose.pose.position.y = goal[1]
         goal_pose.pose.position.z = 0.0
         goal_pose.pose.orientation.w = 1.0
         self.publisher_goal_pose.publish(goal_pose)
@@ -233,3 +296,31 @@ class RosCommunicator(Node):
         if self.latest_imu_data is None:
             return None
         return self.latest_imu_data
+
+    def publish_confirmed_initial_plan(self, path_msg: Path):
+        """
+        確認路徑使用
+        """
+        self.publisher_confirmed_path.publish(path_msg)
+
+    def publish_selected_target_marker(self, x, y, z=0.0):
+        """
+        在 foxglove 畫紅點
+        """
+        marker = Marker()
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.header.frame_id = "map"
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+        marker.pose.position.x = x
+        marker.pose.position.y = y
+        marker.pose.position.z = z
+        marker.scale.x = 0.2  # 球體大小
+        marker.scale.y = 0.2
+        marker.scale.z = 0.2
+        marker.color.a = 1.0  # 透明度
+        marker.color.r = 1.0  # 顏色
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+
+        self.publisher_target_marker.publish(marker)

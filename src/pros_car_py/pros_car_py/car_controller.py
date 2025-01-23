@@ -20,6 +20,13 @@ class CarController:
         self._stop_event = threading.Event()
         self._thread_running = False
 
+        self.target_idx = 0  # 目標索引
+        self.target_list = [
+            [0.12577216615733916, 4.207528556910003],
+            [0.004709751367064641, -0.43933601070552486],
+            [3.202388878639925, 3.893176401328583],
+        ]
+
     def update_action(self, action_key):
         """
         Updates the velocity for each of the car's wheels.
@@ -67,6 +74,7 @@ class CarController:
         elif key == "q":
             self.update_action("STOP")
             return True
+
         else:
             pass
 
@@ -90,6 +98,7 @@ class CarController:
                 self._auto_nav_thread.join()
                 self._thread_running = False
 
+            self.nav_processing.reset_nav_process()
             action_key = self.nav_processing.stop_nav()
             self.ros_communicator.publish_car_control(
                 action_key, publish_rear=True, publish_front=True
@@ -114,21 +123,29 @@ class CarController:
         """
         while not stop_event.is_set():
             if mode == "manual_auto_nav":
-                action_key = self.nav_processing.get_action_from_nav2_plan(
-                    goal_coordinates=None
+                action_key = (
+                    self.nav_processing.get_action_from_nav2_plan_no_dynamic_p_2_p(
+                        goal_coordinates=None
+                    )
                 )
+                if self.nav_processing.get_finish_flag():
+                    self.nav_processing.reset_nav_process()
             elif mode == "target_auto_nav":
-                action_key = self.nav_processing.get_action_from_nav2_plan(
-                    goal_coordinates=target
+
+                current_target = self.target_list[self.target_idx]
+                action_key = (
+                    self.nav_processing.get_action_from_nav2_plan_no_dynamic_p_2_p(
+                        goal_coordinates=current_target
+                    )
                 )
-            print(action_key)
+                if self.nav_processing.get_finish_flag():
+                    self.nav_processing.reset_nav_process()
+                    self.target_idx = (self.target_idx + 1) % len(self.target_list)
+                    continue
             # 發布控制指令
             self.ros_communicator.publish_car_control(
                 action_key, publish_rear=True, publish_front=True
             )
-
-            # 模擬導航延遲
-            time.sleep(0.1)
 
         # 收尾動作
         print("[background_task] Navigation stopped.")

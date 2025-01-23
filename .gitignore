@@ -121,3 +121,5 @@ qtcreator-*
 CATKIN_IGNORE
 
 video.txt
+*.prefab
+*.asset.meta

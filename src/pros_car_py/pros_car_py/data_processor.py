@@ -45,40 +45,52 @@ class DataProcessor:
 
     def get_processed_mediapipe_data(self):
         mediapipe_data_msg = self.ros_communicator.get_latest_mediapipe_data()
-        
+
         # 檢查是否接收到資料，並從中提取座標
         if mediapipe_data_msg is not None:
             # 將 x, y, z 座標放入列表
-            coordinates_list = [mediapipe_data_msg.x, mediapipe_data_msg.y, mediapipe_data_msg.z]
+            coordinates_list = [
+                mediapipe_data_msg.x,
+                mediapipe_data_msg.y,
+                mediapipe_data_msg.z,
+            ]
             return coordinates_list
         else:
             # 如果資料為 None，返回空列表或其他指示資料無效的值
             return []
 
-
     def get_processed_yolo_detection_position(self):
 
-            yolo_detection_position_msg = self.ros_communicator.get_latest_yolo_detection_position()
-            if yolo_detection_position_msg is not None:
-                # 成功获取到检测数据
-                return [
-                    yolo_detection_position_msg.point.x,
-                    yolo_detection_position_msg.point.y,
-                    yolo_detection_position_msg.point.z
-                ]
-            
-            else:
-                return None
-    
+        yolo_detection_position_msg = (
+            self.ros_communicator.get_latest_yolo_detection_position()
+        )
+        if yolo_detection_position_msg is not None:
+            return [
+                yolo_detection_position_msg.point.x,
+                yolo_detection_position_msg.point.y,
+                yolo_detection_position_msg.point.z,
+            ]
+
+        else:
+            return None
+
     def get_processed_yolo_detection_offset(self):
-        yolo_detection_offset_msg = self.ros_communicator.get_latest_yolo_detection_offset()
+        yolo_detection_offset_msg = (
+            self.ros_communicator.get_latest_yolo_detection_offset()
+        )
         if yolo_detection_offset_msg is not None:
-            return [yolo_detection_offset_msg.point.x, yolo_detection_offset_msg.point.y, yolo_detection_offset_msg.point.z]
+            return [
+                yolo_detection_offset_msg.point.x,
+                yolo_detection_offset_msg.point.y,
+                yolo_detection_offset_msg.point.z,
+            ]
         else:
             return None
 
     def get_processed_received_global_plan(self):
-        received_global_plan_msg = self.ros_communicator.get_latest_received_global_plan()
+        received_global_plan_msg = (
+            self.ros_communicator.get_latest_received_global_plan()
+        )
         if received_global_plan_msg is None:
             return None, None
         path_length = len(received_global_plan_msg.poses)
@@ -86,22 +98,39 @@ class DataProcessor:
         coordinates = []
         if path_length > 0:
             last_recorded_point = received_global_plan_msg.poses[0].pose.position
-            orientation_points.append((
-                received_global_plan_msg.poses[0].pose.orientation.z, 
-                received_global_plan_msg.poses[0].pose.orientation.w))
-            coordinates.append((
-                received_global_plan_msg.poses[0].pose.position.x, 
-                received_global_plan_msg.poses[0].pose.position.y))
+            orientation_points.append(
+                (
+                    received_global_plan_msg.poses[0].pose.orientation.z,
+                    received_global_plan_msg.poses[0].pose.orientation.w,
+                )
+            )
+            coordinates.append(
+                (
+                    received_global_plan_msg.poses[0].pose.position.x,
+                    received_global_plan_msg.poses[0].pose.position.y,
+                )
+            )
             for i in range(1, path_length):
                 current_point = received_global_plan_msg.poses[i].pose.position
                 distance = math.sqrt(
-                    (current_point.x - last_recorded_point.x) ** 2 +
-                    (current_point.y - last_recorded_point.y) ** 2
+                    (current_point.x - last_recorded_point.x) ** 2
+                    + (current_point.y - last_recorded_point.y) ** 2
                 )
                 if distance >= 0.1:
-                    orientation_points.append((
-                        received_global_plan_msg.poses[i].pose.orientation.z, 
-                        received_global_plan_msg.poses[i].pose.orientation.w))
+                    orientation_points.append(
+                        (
+                            received_global_plan_msg.poses[i].pose.orientation.z,
+                            received_global_plan_msg.poses[i].pose.orientation.w,
+                        )
+                    )
                     coordinates.append((current_point.x, current_point.y))
                     last_recorded_point = current_point
         return orientation_points, coordinates
+
+    def get_processed_received_global_plan_no_dynamic(self):
+        received_global_plan_msg = (
+            self.ros_communicator.get_latest_received_global_plan()
+        )
+        if received_global_plan_msg is None:
+            return None, None
+        return received_global_plan_msg

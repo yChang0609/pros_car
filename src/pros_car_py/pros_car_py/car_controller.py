@@ -20,6 +20,13 @@ class CarController:
         self._stop_event = threading.Event()
         self._thread_running = False
 
+        self.target_idx = 0  # 目標索引
+        self.target_list = [
+            [-1.0867680165195726, 0.18043637094321668],
+            [1.248710862849299, -2.203017323029217],
+            [-0.8499180290293862, -3.1825969112599957],
+        ]
+
     def update_action(self, action_key):
         """
         Updates the velocity for each of the car's wheels.
@@ -114,21 +121,23 @@ class CarController:
         """
         while not stop_event.is_set():
             if mode == "manual_auto_nav":
-                action_key = self.nav_processing.get_action_from_nav2_plan(
+                action_key = self.nav_processing.get_action_from_nav2_plan_no_dynamic(
                     goal_coordinates=None
                 )
             elif mode == "target_auto_nav":
-                action_key = self.nav_processing.get_action_from_nav2_plan(
-                    goal_coordinates=target
+
+                current_target = self.target_list[self.target_idx]
+                action_key = self.nav_processing.get_action_from_nav2_plan_no_dynamic(
+                    goal_coordinates=current_target
                 )
-            print(action_key)
+                if self.nav_processing.getFinishFlag():
+                    self.nav_processing.resetFinishFlag()
+                    self.target_idx = (self.target_idx + 1) % len(self.target_list)
+                    continue
             # 發布控制指令
             self.ros_communicator.publish_car_control(
                 action_key, publish_rear=True, publish_front=True
             )
-
-            # 模擬導航延遲
-            time.sleep(0.1)
 
         # 收尾動作
         print("[background_task] Navigation stopped.")

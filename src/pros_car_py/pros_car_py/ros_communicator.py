@@ -151,13 +151,13 @@ class RosCommunicator(Node):
             self.publisher_forward.publish(msg)
 
     # publish goal_pose
-    def publish_goal_pose(self, goal_pose):
+    def publish_goal_pose(self, goal):
         goal_pose = PoseStamped()
         goal_pose.header = Header()
         goal_pose.header.stamp = self.get_clock().now().to_msg()
         goal_pose.header.frame_id = "map"
-        goal_pose.pose.position.x = goal_pose[0]
-        goal_pose.pose.position.y = goal_pose[1]
+        goal_pose.pose.position.x = goal[0]
+        goal_pose.pose.position.y = goal[1]
         goal_pose.pose.position.z = 0.0
         goal_pose.pose.orientation.w = 1.0
         self.publisher_goal_pose.publish(goal_pose)

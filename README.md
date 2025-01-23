@@ -1,5 +1,6 @@
 # pros_car 使用說明
-
+## class diagram
+![pros_car](https://github.com/alianlbj23/pros_car/blob/main/img/pros_car.drawio.png?raw=true)
 ## 🚀 環境初始化
 1. 執行以下指令進入環境：
    ```bash

@@ -90,6 +90,7 @@ class Nav2Processing:
                     self.data_processor.get_processed_received_global_plan_no_dynamic()
                 )
                 self.recordFlag = 1
+                action_key = "STOP"
 
         car_position, car_orientation = self.data_processor.get_processed_amcl_pose()
 
@@ -108,11 +109,11 @@ class Nav2Processing:
         diff_angle = self.calculate_diff_angle(
             car_position, car_orientation, target_x, target_y
         )
-        if diff_angle < 30 and diff_angle > -30:
+        if diff_angle < 20 and diff_angle > -20:
             action_key = "FORWARD"
-        elif diff_angle < -30 and diff_angle > -180:
+        elif diff_angle < -20 and diff_angle > -180:
             action_key = "CLOCKWISE_ROTATION"
-        elif diff_angle > 30 and diff_angle < 180:
+        elif diff_angle > 20 and diff_angle < 180:
             action_key = "COUNTERCLOCKWISE_ROTATION"
         return action_key
 

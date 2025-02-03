@@ -60,6 +60,7 @@ if [ "$ARCH" = "aarch64" ]; then
     docker run -it --rm \
         --network compose_my_bridge_network \
         $PORT_MAPPING \
+        $device_options \
         --runtime=nvidia \
         --env-file .env \
         -v "$(pwd)/src:/workspaces/src" \
@@ -74,6 +75,7 @@ elif [ "$ARCH" = "x86_64" ] || ([ "$ARCH" = "arm64" ] && [ "$OS" = "Darwin" ]); 
         docker run -it --rm \
             --network compose_my_bridge_network \
             $PORT_MAPPING \
+            $device_options \
             --env-file .env \
             -v "$(pwd)/src:/workspaces/src" \
             -v "$(pwd)/screenshots:/workspaces/screenshots" \
@@ -85,6 +87,7 @@ elif [ "$ARCH" = "x86_64" ] || ([ "$ARCH" = "arm64" ] && [ "$OS" = "Darwin" ]); 
             --network compose_my_bridge_network \
             $PORT_MAPPING \
             $GPU_FLAGS \
+            $device_options \
             --env-file .env \
             -v "$(pwd)/src:/workspaces/src" \
             -v "$(pwd)/screenshots:/workspaces/screenshots" \
@@ -98,6 +101,7 @@ elif [ "$ARCH" = "x86_64" ] || ([ "$ARCH" = "arm64" ] && [ "$OS" = "Darwin" ]); 
                 --network compose_my_bridge_network \
                 $PORT_MAPPING \
                 --env-file .env \
+                $device_options \
                 -v "$(pwd)/src:/workspaces/src" \
                 -v "$(pwd)/screenshots:/workspaces/screenshots" \
                 ghcr.io/screamlab/pros_car_docker_image:latest \

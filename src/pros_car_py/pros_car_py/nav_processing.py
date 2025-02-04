@@ -128,6 +128,9 @@ class Nav2Processing:
         """
         選擇距離車輛 min_required_distance 以上最短路徑然後返回 target_x, target_y
         """
+        if self.global_plan_msg is None or self.global_plan_msg.poses is None:
+            print("Error: global_plan_msg is None or poses is missing!")
+            return None, None
         while self.index < len(self.global_plan_msg.poses) - 1:
             target_x = self.global_plan_msg.poses[self.index].pose.position.x
             target_y = self.global_plan_msg.poses[self.index].pose.position.y

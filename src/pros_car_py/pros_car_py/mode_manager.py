@@ -69,16 +69,18 @@ class AutoNavMode(BaseMode):
 
 
 class AutoArmMode(BaseMode):
-    submodes = ["Arm Mode 1", "Arm Mode 2", "Arm Mode 3"]
+    submodes = ["auto_arm_human"]
 
     def enter(self):
         self.app.horizontal_select(self.submodes, self.handle_submode_select)
 
     def handle_submode_select(self, submode):
         def on_key(key):
-            self.app.crane_controller.manual_control(int(submode), key)
+            self.app.arm_controller.auto_control(mode=submode, key=key)
+            if key == "q":
+                self.app.arm_controller.auto_control(mode=submode, key=key)
 
         self.show_submode_screen(
-            message=f"Crane Mode: Submode {submode}\nPress 'q' to go back.",
+            message=f"AutoArm Mode: Submode {submode}\nPress 'q' to go back.",
             on_key=on_key,
         )

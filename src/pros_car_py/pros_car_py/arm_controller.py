@@ -372,15 +372,16 @@ class ArmController:
             # self.set_joint_position(1,self.joint_pos[1],50,60)
             # print(self.joint_pos[2])
 
-            # if self.joint_pos[0] < math.radians(30.0):
-            #     self.joint_pos[0] = math.radians(30.0)
-            # if self.joint_pos[0] > math.radians(150.0):
-            #     self.joint_pos[0] = math.radians(150.0)
-
-            # if self.joint_pos[2] < math.radians(40.0):
-            #     self.joint_pos[2] = math.radians(40.0)
-            # if self.joint_pos[1] < math.radians(40.0):
-            #     self.joint_pos[1] = math.radians(40.0)
+            if self.joint_pos[0] < math.radians(30.0):
+                self.joint_pos[0] = math.radians(30.0)
+            if self.joint_pos[0] > math.radians(150.0):
+                self.joint_pos[0] = math.radians(150.0)
+            if self.joint_pos[3] < math.radians(100.0):
+                self.joint_pos[3] = math.radians(100.0)
+            if self.joint_pos[2] < math.radians(40.0):
+                self.joint_pos[2] = math.radians(40.0)
+            if self.joint_pos[1] < math.radians(40.0):
+                self.joint_pos[1] = math.radians(40.0)
             if self.joint_pos[1] > math.radians(100.0):
                 self.joint_pos[1] = math.radians(100.0)
             self.joint_pos[-1] = math.radians(10.0)

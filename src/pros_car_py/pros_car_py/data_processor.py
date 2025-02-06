@@ -22,6 +22,18 @@ class DataProcessor:
         quaternion = [orientation.x, orientation.y, orientation.z, orientation.w]
         return pose, quaternion
 
+    def get_yolo_target_info(self):
+        if self.ros_communicator.get_latest_yolo_target_info() is not None:
+            return list(self.ros_communicator.get_latest_yolo_target_info().data)
+        else:
+            return None
+
+    def get_camera_x_multi_depth(self):
+        if self.ros_communicator.get_latest_camera_x_multi_depth() is not None:
+            return list(self.ros_communicator.get_latest_camera_x_multi_depth().data)
+        else:
+            return None
+
     def get_processed_lidar(self):
         lidar_msg = self.ros_communicator.get_latest_lidar()
         angle_min = lidar_msg.angle_min

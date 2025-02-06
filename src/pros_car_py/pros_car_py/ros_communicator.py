@@ -83,11 +83,11 @@ class RosCommunicator(Node):
             Float32MultiArray, "/yolo/target_info", self.yolo_target_info_callback, 10
         )
 
-        self.latest_camera_center_depth = None
-        self.camera_center_depth_sub = self.create_subscription(
+        self.latest_camera_x_multi_depth = None
+        self.camera_x_multi_depth_sub = self.create_subscription(
             Float32MultiArray,
-            "/camera/center_depth",
-            self.camera_center_depth_callback,
+            "/camera/x_multi_depth_values",
+            self.camera_x_multi_depth_callback,
             10,
         )
 
@@ -271,13 +271,13 @@ class RosCommunicator(Node):
             return None
         return self.latest_yolo_target_info
 
-    def camera_center_depth_callback(self, msg):
-        self.latest_camera_center_depth = msg
+    def camera_x_multi_depth_callback(self, msg):
+        self.latest_camera_x_multi_depth = msg
 
-    def get_camera_center_depth(self):
-        if self.latest_camera_center_depth is None:
+    def get_latest_camera_x_multi_depth(self):
+        if self.latest_camera_x_multi_depth is None:
             return None
-        return self.latest_camera_center_depth
+        return self.latest_camera_x_multi_depth
 
     # YOLO coordinates callback
     def yolo_detection_position_callback(self, msg):

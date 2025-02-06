@@ -73,6 +73,7 @@ class CarController:
             self.update_action("STOP")
         elif key == "q":
             self.update_action("STOP")
+            time.sleep(0.1)
             return True
 
         else:
@@ -119,7 +120,7 @@ class CarController:
 
     def stop_nav(self):
         for i in range(20):
-            time.sleep(0.05)
+            time.sleep(0.1)
             self.update_action("STOP")
 
     def background_task(self, stop_event, mode, target):

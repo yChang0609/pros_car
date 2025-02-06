@@ -143,6 +143,40 @@ class CarController:
                     self.target_idx = (self.target_idx + 1) % len(self.target_list)
                     continue
             # 發布控制指令
+
+            elif mode == "custom_nav":
+                """
+                YOLO 目標資訊 (yolo_target_info) 說明：
+
+                - 索引 0 (index 0)：
+                    - 表示是否成功偵測到目標
+                    - 0：未偵測到目標
+                    - 1：成功偵測到目標
+
+                - 索引 1 (index 1)：
+                    - 目標的深度距離 (與相機的距離)
+
+                - 索引 2 (index 2)：
+                    - 目標相對於畫面正中心的像素偏移量
+                    - 若目標位於畫面中心右側，數值為正
+                    - 若目標位於畫面中心左側，數值為負
+
+                其他資訊：
+                - camera_center_depth[0]：畫面正中心點的深度距離
+                """
+
+                # 取得最新的 YOLO 目標資訊
+                yolo_target_info = list(
+                    self.ros_communicator.get_latest_yolo_target_info().data
+                )
+
+                # 取得畫面正中心的深度資訊
+                camera_center_depth = list(
+                    self.ros_communicator.get_camera_center_depth().data
+                )
+                print(yolo_target_info[2])
+                action_key = "STOP"
+
             self.ros_communicator.publish_car_control(
                 action_key, publish_rear=True, publish_front=True
             )

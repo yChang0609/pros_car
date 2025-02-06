@@ -51,7 +51,7 @@ class CraneMode(BaseMode):
 
 
 class AutoNavMode(BaseMode):
-    submodes = ["manual_auto_nav", "target_auto_nav"]
+    submodes = ["manual_auto_nav", "target_auto_nav", "custom_nav"]
 
     def enter(self):
         self.app.horizontal_select(self.submodes, self.handle_submode_select)

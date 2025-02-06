@@ -99,7 +99,7 @@ class CarController:
                 self._thread_running = False
 
             self.nav_processing.reset_nav_process()
-            action_key = self.nav_processing.stop_nav()
+            action_key = "STOP"
             self.ros_communicator.publish_car_control(
                 action_key, publish_rear=True, publish_front=True
             )
@@ -117,11 +117,18 @@ class CarController:
 
         return False
 
+    def stop_nav(self):
+        for i in range(20):
+            time.sleep(0.05)
+            self.update_action("STOP")
+
     def background_task(self, stop_event, mode, target):
         """
         後台任務：不斷執行導航動作直到 stop_event 被設定。
         """
+
         while not stop_event.is_set():
+
             if mode == "manual_auto_nav":
                 action_key = (
                     self.nav_processing.get_action_from_nav2_plan_no_dynamic_p_2_p(
@@ -145,36 +152,9 @@ class CarController:
             # 發布控制指令
 
             elif mode == "custom_nav":
-                """
-                YOLO 目標資訊 (yolo_target_info) 說明：
+                action_key = self.nav_processing.camera_nav()
 
-                - 索引 0 (index 0)：
-                    - 表示是否成功偵測到目標
-                    - 0：未偵測到目標
-                    - 1：成功偵測到目標
-
-                - 索引 1 (index 1)：
-                    - 目標的深度距離 (與相機的距離)
-
-                - 索引 2 (index 2)：
-                    - 目標相對於畫面正中心的像素偏移量
-                    - 若目標位於畫面中心右側，數值為正
-                    - 若目標位於畫面中心左側，數值為負
-
-                其他資訊：
-                - camera_center_depth[0]：畫面正中心點的深度距離
-                """
-
-                # 取得最新的 YOLO 目標資訊
-                yolo_target_info = list(
-                    self.ros_communicator.get_latest_yolo_target_info().data
-                )
-
-                # 取得畫面正中心的深度資訊
-                camera_center_depth = list(
-                    self.ros_communicator.get_camera_center_depth().data
-                )
-                print(yolo_target_info[2])
+            if self._thread_running == False:
                 action_key = "STOP"
 
             self.ros_communicator.publish_car_control(

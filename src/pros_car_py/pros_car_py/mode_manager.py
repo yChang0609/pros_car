@@ -14,6 +14,7 @@ class VehicleMode(BaseMode):
 
     def handle_input(self, key):
         if key == "q":
+            self.app.car_controller.manual_control(key)
             self.app.main_menu()
         else:
             self.app.car_controller.manual_control(key)
@@ -61,6 +62,7 @@ class AutoNavMode(BaseMode):
             self.app.car_controller.auto_control(submode, key)
             if key == "q":
                 self.app.car_controller.auto_control(submode, key=key)
+                self.app.car_controller.stop_nav()
 
         self.show_submode_screen(
             message=f"AutoNav Mode: Submode {submode}\nPress 'q' to go back.",

@@ -62,7 +62,6 @@ class AutoNavMode(BaseMode):
             self.app.car_controller.auto_control(submode, key)
             if key == "q":
                 self.app.car_controller.auto_control(submode, key=key)
-                self.app.car_controller.stop_nav()
 
         self.show_submode_screen(
             message=f"AutoNav Mode: Submode {submode}\nPress 'q' to go back.",

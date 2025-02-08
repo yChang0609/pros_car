@@ -78,6 +78,19 @@ class RosCommunicator(Node):
             Point, "/mediapipe_data", self.mediapipe_data_callback, 10
         )
 
+        self.latest_yolo_target_info = None
+        self.yolo_target_info_sub = self.create_subscription(
+            Float32MultiArray, "/yolo/target_info", self.yolo_target_info_callback, 10
+        )
+
+        self.latest_camera_x_multi_depth = None
+        self.camera_x_multi_depth_sub = self.create_subscription(
+            Float32MultiArray,
+            "/camera/x_multi_depth_values",
+            self.camera_x_multi_depth_callback,
+            10,
+        )
+
         # publish car_C_rear_wheel and car_C_front_wheel
         self.publisher_rear = self.create_publisher(
             Float32MultiArray, DeviceDataTypeEnum.car_C_rear_wheel, 10
@@ -249,6 +262,22 @@ class RosCommunicator(Node):
             self.get_logger().warn("No Mediapipe data received yet.")
             return None
         return self.latest_mediapipe_data
+
+    def yolo_target_info_callback(self, msg):
+        self.latest_yolo_target_info = msg
+
+    def get_latest_yolo_target_info(self):
+        if self.latest_yolo_target_info is None:
+            return None
+        return self.latest_yolo_target_info
+
+    def camera_x_multi_depth_callback(self, msg):
+        self.latest_camera_x_multi_depth = msg
+
+    def get_latest_camera_x_multi_depth(self):
+        if self.latest_camera_x_multi_depth is None:
+            return None
+        return self.latest_camera_x_multi_depth
 
     # YOLO coordinates callback
     def yolo_detection_position_callback(self, msg):

@@ -153,5 +153,122 @@ class Nav2Processing:
         )
         return diff_angle
 
+    def filter_negative_one(self, depth_list):
+        return [depth for depth in depth_list if depth != -1.0]
+
+    def camera_nav(self):
+        """
+        YOLO 目標資訊 (yolo_target_info) 說明：
+
+        - 索引 0 (index 0)：
+            - 表示是否成功偵測到目標
+            - 0：未偵測到目標
+            - 1：成功偵測到目標
+
+        - 索引 1 (index 1)：
+            - 目標的深度距離 (與相機的距離，單位為公尺)，如果沒偵測到目標就回傳 0
+            - 與目標過近時(大約 40 公分以內)會回傳 -1
+
+        - 索引 2 (index 2)：
+            - 目標相對於畫面正中心的像素偏移量
+            - 若目標位於畫面中心右側，數值為正
+            - 若目標位於畫面中心左側，數值為負
+            - 若沒有目標則回傳 0
+
+        畫面 n 個等分點深度 (camera_multi_depth) 說明 :
+
+        - 儲存相機畫面中央高度上 n 個等距水平點的深度值。
+        - 若距離過遠、過近（小於 40 公分）或是實體相機有時候深度會出一些問題，則該點的深度值將設定為 -1。
+        """
+        yolo_target_info = self.data_processor.get_yolo_target_info()
+        camera_multi_depth = self.data_processor.get_camera_x_multi_depth()
+        if camera_multi_depth == None or yolo_target_info == None:
+            return "STOP"
+
+        camera_forward_depth = self.filter_negative_one(camera_multi_depth[7:13])
+        camera_left_depth = self.filter_negative_one(camera_multi_depth[0:7])
+        camera_right_depth = self.filter_negative_one(camera_multi_depth[13:20])
+
+        action = "STOP"
+        limit_distance = 0.7
+
+        if all(depth > limit_distance for depth in camera_forward_depth):
+            if yolo_target_info[0] == 1:
+                if yolo_target_info[2] > 200.0:
+                    action = "CLOCKWISE_ROTATION_SLOW"
+                elif yolo_target_info[2] < -200.0:
+                    action = "COUNTERCLOCKWISE_ROTATION_SLOW"
+                else:
+                    if yolo_target_info[1] < 0.8:
+                        action = "STOP"
+                    else:
+                        action = "FORWARD_SLOW"
+            else:
+                action = "FORWARD"
+        elif any(depth < limit_distance for depth in camera_left_depth):
+            action = "CLOCKWISE_ROTATION"
+        elif any(depth < limit_distance for depth in camera_right_depth):
+            action = "COUNTERCLOCKWISE_ROTATION"
+        return action
+
+    def camera_nav_unity(self):
+        """
+        YOLO 目標資訊 (yolo_target_info) 說明：
+
+        - 索引 0 (index 0)：
+            - 表示是否成功偵測到目標
+            - 0：未偵測到目標
+            - 1：成功偵測到目標
+
+        - 索引 1 (index 1)：
+            - 目標的深度距離 (與相機的距離，單位為公尺)，如果沒偵測到目標就回傳 0
+            - 與目標過近時(大約 40 公分以內)會回傳 -1
+
+        - 索引 2 (index 2)：
+            - 目標相對於畫面正中心的像素偏移量
+            - 若目標位於畫面中心右側，數值為正
+            - 若目標位於畫面中心左側，數值為負
+            - 若沒有目標則回傳 0
+
+        畫面 n 個等分點深度 (camera_multi_depth) 說明 :
+
+        - 儲存相機畫面中央高度上 n 個等距水平點的深度值。
+        - 若距離過遠、過近（小於 40 公分）或是實體相機有時候深度會出一些問題，則該點的深度值將設定為 -1。
+        """
+        yolo_target_info = self.data_processor.get_yolo_target_info()
+        camera_multi_depth = self.data_processor.get_camera_x_multi_depth()
+        yolo_target_info[1] *= 100.0
+        camera_multi_depth = list(
+            map(lambda x: x * 100.0, self.data_processor.get_camera_x_multi_depth())
+        )
+
+        if camera_multi_depth == None or yolo_target_info == None:
+            return "STOP"
+
+        camera_forward_depth = self.filter_negative_one(camera_multi_depth[7:13])
+        camera_left_depth = self.filter_negative_one(camera_multi_depth[0:7])
+        camera_right_depth = self.filter_negative_one(camera_multi_depth[13:20])
+        action = "STOP"
+        limit_distance = 10.0
+        print(yolo_target_info[1])
+        if all(depth > limit_distance for depth in camera_forward_depth):
+            if yolo_target_info[0] == 1:
+                if yolo_target_info[2] > 200.0:
+                    action = "CLOCKWISE_ROTATION_SLOW"
+                elif yolo_target_info[2] < -200.0:
+                    action = "COUNTERCLOCKWISE_ROTATION_SLOW"
+                else:
+                    if yolo_target_info[1] < 2.0:
+                        action = "STOP"
+                    else:
+                        action = "FORWARD_SLOW"
+            else:
+                action = "FORWARD"
+        elif any(depth < limit_distance for depth in camera_left_depth):
+            action = "CLOCKWISE_ROTATION"
+        elif any(depth < limit_distance for depth in camera_right_depth):
+            action = "COUNTERCLOCKWISE_ROTATION"
+        return action
+
     def stop_nav(self):
         return "STOP"

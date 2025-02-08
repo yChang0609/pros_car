@@ -73,6 +73,7 @@ class CarController:
             self.update_action("STOP")
         elif key == "q":
             self.update_action("STOP")
+            time.sleep(0.1)
             return True
 
         else:
@@ -99,7 +100,7 @@ class CarController:
                 self._thread_running = False
 
             self.nav_processing.reset_nav_process()
-            action_key = self.nav_processing.stop_nav()
+            action_key = "STOP"
             self.ros_communicator.publish_car_control(
                 action_key, publish_rear=True, publish_front=True
             )
@@ -117,11 +118,18 @@ class CarController:
 
         return False
 
+    def stop_nav(self):
+        for i in range(20):
+            time.sleep(0.1)
+            self.update_action("STOP")
+
     def background_task(self, stop_event, mode, target):
         """
         後台任務：不斷執行導航動作直到 stop_event 被設定。
         """
+
         while not stop_event.is_set():
+
             if mode == "manual_auto_nav":
                 action_key = (
                     self.nav_processing.get_action_from_nav2_plan_no_dynamic_p_2_p(
@@ -143,6 +151,13 @@ class CarController:
                     self.target_idx = (self.target_idx + 1) % len(self.target_list)
                     continue
             # 發布控制指令
+
+            elif mode == "custom_nav":
+                action_key = self.nav_processing.camera_nav_unity()
+
+            if self._thread_running == False:
+                action_key = "STOP"
+
             self.ros_communicator.publish_car_control(
                 action_key, publish_rear=True, publish_front=True
             )

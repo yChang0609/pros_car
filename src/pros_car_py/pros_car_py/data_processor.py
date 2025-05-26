@@ -14,6 +14,9 @@ class DataProcessor:
     def __init__(self, ros_communicator):
         self.ros_communicator = ros_communicator
 
+    def get_aruco_estimate_pose(self):
+        pose = self.ros_communicator.get_aruco_estimate_pose()
+        return pose
     def get_processed_amcl_pose(self):
         amcl_pose_msg = self.ros_communicator.get_latest_amcl_pose()
         position = amcl_pose_msg.pose.pose.position

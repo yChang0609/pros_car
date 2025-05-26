@@ -155,6 +155,10 @@ class CarController:
             elif mode == "custom_nav":
                 action_key = self.nav_processing.camera_nav_unity()
 
+            elif mode == "fix_living_room":
+                action_key = self.nav_processing.fix_living_room_nav()
+
+
             if self._thread_running == False:
                 action_key = "STOP"
             print(action_key)

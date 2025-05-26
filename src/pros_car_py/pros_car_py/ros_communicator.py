@@ -20,7 +20,8 @@ import rclpy
 class RosCommunicator(Node):
     def __init__(self):
         super().__init__("RosCommunicator")
-
+        
+        # >> Subscriber 
         # subscribeamcl_pose
         self.latest_amcl_pose = None
         self.subscriber_amcl = self.create_subscription(
@@ -91,6 +92,13 @@ class RosCommunicator(Node):
             10,
         )
 
+        self.aruco_estimate_pose_sub = self.create_subscription(
+            PoseWithCovarianceStamped, '/aruco_detector/pose', 
+            self.aruco_estimate_pose_callback, 10
+        )
+
+        # >> Publisher
+
         # publish car_C_rear_wheel and car_C_front_wheel
         self.publisher_rear = self.create_publisher(
             Float32MultiArray, DeviceDataTypeEnum.car_C_rear_wheel, 10
@@ -147,6 +155,7 @@ class RosCommunicator(Node):
             self, NavigateToPose, "/navigate_to_pose"
         )
 
+
     def clear_received_global_plan(self):
         """
         清空 /received_global_plan 话题
@@ -172,6 +181,12 @@ class RosCommunicator(Node):
         self.clear_received_global_plan()
         self.clear_plan()
         self.get_logger().info("Nav2 Reset Completed")
+
+    def aruco_estimate_pose_callback(self, msg):
+        self.latest_aruco_estimate_pose = msg
+        
+    def get_aruco_estimate_pose(self):
+        return self.latest_aruco_estimate_pose
 
     # amcl_pose callback and get_latest_amcl_pose
     def subscriber_amcl_callback(self, msg):

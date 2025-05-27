@@ -281,6 +281,8 @@ class Nav2Processing:
             self.first_nav = False
         target_list = [(2.310, 6.440)]
         for target in target_list:
+            self.path_planner.planning(self.data_processor.get_aruco_estimate_pose(), target)
+            self.data_processor.pub_path(self.path_planner.path)
             while cal_distance(target, pose) < 1.0 : # meter
                 pose = self.data_processor.get_aruco_estimate_pose()
                 min_idx, min_dist = search_nearest(self.path_planner.path, (x,y))

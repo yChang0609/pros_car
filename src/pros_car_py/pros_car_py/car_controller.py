@@ -161,7 +161,7 @@ class CarController:
 
             if self._thread_running == False:
                 action_key = "STOP"
-            print(action_key)
+            # print(action_key)
             time.sleep(0.05)
             self.ros_communicator.publish_car_control(
                 action_key, publish_rear=True, publish_front=True

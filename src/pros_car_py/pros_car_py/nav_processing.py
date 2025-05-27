@@ -6,11 +6,12 @@ from pros_car_py.nav2_utils import (
     cal_distance,
 )
 import math
-
-from pros_car_py.path_planing import PlannerRRTStar
+from pros_car_py.data_processor import DataProcessor
+from pros_car_py.ros_communicator import RosCommunicator
+from pros_car_py.path_planing import PlannerRRTStar, MapLoader
 
 class Nav2Processing:
-    def __init__(self, ros_communicator, data_processor):
+    def __init__(self, ros_communicator:RosCommunicator, data_processor:DataProcessor):
         self.ros_communicator = ros_communicator
         self.data_processor = data_processor
         self.finishFlag = False
@@ -277,31 +278,35 @@ class Nav2Processing:
     def fix_living_room_nav(self):
         if self.first_nav:
             # TODO:Load map and map config map.pgm / map.yaml
-            self.path_planner = PlannerRRTStar(m, m_config)
+            self.path_planner = PlannerRRTStar(MapLoader("/workspaces/src/pros_car_py/config/living_room"))
+            self.ros_communicator.publish_aruco_marker_config(
+                self.path_planner.maploader.unflipped_ids,
+                self.path_planner.maploader.aruco_config)
             self.first_nav = False
-        target_list = [(2.310, 6.440)]
-        for target in target_list:
-            self.path_planner.planning(self.data_processor.get_aruco_estimate_pose(), target)
-            self.data_processor.pub_path(self.path_planner.path)
-            while cal_distance(target, pose) < 1.0 : # meter
-                pose = self.data_processor.get_aruco_estimate_pose()
-                min_idx, min_dist = search_nearest(self.path_planner.path, (x,y))
-                target = self.path_planner.path[min_idx]
-                car_yaw = get_yaw_from_quaternion(
-                    car_orientation_z, car_orientation_w
-                )
-                ang = np.arctan2(self.path_planner.path[min_idx][1]-pose.y, self.path_planner.path[min_idx][0]-pose.x)
-                diff_angle = (ang - car_yaw) % 360.0
-                if diff_angle < 30.0 or (diff_angle > 330 and diff_angle < 360):
-                    action_key = "FORWARD"
-                elif diff_angle > 30.0 and diff_angle < 180.0:
-                    action_key = "COUNTERCLOCKWISE_ROTATION"
-                elif diff_angle > 180.0 and diff_angle < 330.0:
-                    action_key = "CLOCKWISE_ROTATION"
-                else:
-                    action_key = "STOP"
-                yield action_key
-                pose = self.data_processor.get_aruco_estimate_pose()
+
+        # target_list = [(2.310, 6.440)]
+        # for target in target_list:
+        #     self.path_planner.planning(self.data_processor.get_aruco_estimate_pose(), target)
+        #     self.data_processor.pub_path(self.path_planner.path)
+        #     while cal_distance(target, pose) < 1.0 : # meter
+        #         pose = self.data_processor.get_aruco_estimate_pose()
+        #         min_idx, min_dist = search_nearest(self.path_planner.path, (x,y))
+        #         target = self.path_planner.path[min_idx]
+        #         car_yaw = get_yaw_from_quaternion(
+        #             car_orientation_z, car_orientation_w
+        #         )
+        #         ang = np.arctan2(self.path_planner.path[min_idx][1]-pose.y, self.path_planner.path[min_idx][0]-pose.x)
+        #         diff_angle = (ang - car_yaw) % 360.0
+        #         if diff_angle < 30.0 or (diff_angle > 330 and diff_angle < 360):
+        #             action_key = "FORWARD"
+        #         elif diff_angle > 30.0 and diff_angle < 180.0:
+        #             action_key = "COUNTERCLOCKWISE_ROTATION"
+        #         elif diff_angle > 180.0 and diff_angle < 330.0:
+        #             action_key = "CLOCKWISE_ROTATION"
+        #         else:
+        #             action_key = "STOP"
+        #         yield action_key
+        #         pose = self.data_processor.get_aruco_estimate_pose()
         return "STOP"
 
 

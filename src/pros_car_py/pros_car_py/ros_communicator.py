@@ -15,7 +15,7 @@ from nav2_msgs.srv import ClearEntireCostmap
 from rclpy.action import ActionClient
 from nav2_msgs.action import NavigateToPose
 import rclpy
-
+from interfaces_pkg.msg import ArucoMarker, ArucoMarkerConfig
 
 class RosCommunicator(Node):
     def __init__(self):
@@ -129,6 +129,10 @@ class RosCommunicator(Node):
 
         self.publisher_target_marker = self.create_publisher(
             Marker, "/selected_target_marker", 10
+        )
+
+        self.publisher_ArucoMarkerConfig = self.create_publisher(
+            ArucoMarkerConfig, "/aruco_marker/config", 10
         )
 
         # 創清除 costmap Service
@@ -368,3 +372,9 @@ class RosCommunicator(Node):
         marker.color.b = 0.0
 
         self.publisher_target_marker.publish(marker)
+    
+    def publish_aruco_marker_config(
+            unflipped_ids:list,
+            aruco_config:dict
+    ):
+        pass

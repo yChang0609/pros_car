@@ -5,6 +5,45 @@ import numpy as np
 import sys
 import abc
 
+import os
+import yaml
+import cv2
+
+class MapLoader:
+    def __init__(self, path):
+        aruco_path = os.path.join(path, 'config', 'aruco_location.yaml')
+
+        with open(aruco_path, 'r') as f:
+            full_config = yaml.safe_load(f)
+
+        self.unflipped_ids = full_config.get('unflipped_ids', [])
+        self.aruco_config = {int(k): v for k, v in full_config.items() if k != 'unflipped_ids'}
+
+        print("\nLoaded ArUco config:")
+        print("Unflipped IDs:", self.unflipped_ids)
+        print("Marker Config:")
+        for marker_id, pose in self.aruco_config.items():
+            print(f"  ID {marker_id}: {pose}")
+
+        map_path = os.path.join(path, 'map')
+        yaml_path = os.path.join(map_path, 'map01.yaml')
+        with open(yaml_path, 'r') as f:
+            map_metadata = yaml.safe_load(f)
+
+        image_path = os.path.join(map_path, map_metadata['image'])
+        self.resolution = map_metadata['resolution']
+        self.origin = map_metadata['origin']
+        self.occupied_thresh = map_metadata.get('occupied_thresh', 0.65)
+
+        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        if img is None:
+            raise RuntimeError(f"Can't load map: {image_path}")
+        if len(img.shape) == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        self.map = cv2.flip(img, 0)
+        self.height, self.width = self.map.shape
+
 def Bresenham(x0, x1, y0, y1):
     rec = []
     dx = abs(x1 - x0)
@@ -40,9 +79,9 @@ def distance(n1, n2):
         return np.hypot(d[0], d[1])
 
 class Planner:
-    def __init__(self, m, map_config):
-        self.map = m
-        self.map_config = map_config
+    def __init__(self, maploader:MapLoader):
+        self.maploader = maploader
+
     def position_to_pixel(self, position):
         return position
     def pixel_to_position(self, pixel):
@@ -53,8 +92,8 @@ class Planner:
         return NotImplementedError
 
 class PlannerRRTStar(Planner):
-    def __init__(self, m, map_config, extend_len=20):
-        super().__init__(m, map_config)
+    def __init__(self, maploader:MapLoader, extend_len=20):
+        super().__init__(maploader)
         self.extend_len = extend_len 
 
     def _random_node(self, goal, shape):

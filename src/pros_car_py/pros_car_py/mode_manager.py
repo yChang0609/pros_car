@@ -52,7 +52,7 @@ class CraneMode(BaseMode):
 
 
 class AutoNavMode(BaseMode):
-    submodes = ["manual_auto_nav", "target_auto_nav", "custom_nav", "fix_living_room"]
+    submodes = ["random_living_room_nav", "manual_auto_nav", "target_auto_nav", "custom_nav", ]
 
     def enter(self):
         self.app.horizontal_select(self.submodes, self.handle_submode_select)
@@ -60,7 +60,7 @@ class AutoNavMode(BaseMode):
     def handle_submode_select(self, submode):
         def on_key(key):
             self.app.car_controller.auto_control(submode, key)
-            if key == "q":
+            if key == "q" or key == "s":
                 self.app.car_controller.auto_control(submode, key=key)
 
         self.show_submode_screen(

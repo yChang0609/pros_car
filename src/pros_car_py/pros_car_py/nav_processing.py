@@ -5,10 +5,11 @@ from pros_car_py.nav2_utils import (
     calculate_angle_point,
     cal_distance,
 )
-import math
+import numpy as np
 from pros_car_py.data_processor import DataProcessor
 from pros_car_py.ros_communicator import RosCommunicator
 from pros_car_py.path_planing import PlannerRRTStar, MapLoader
+from pros_car_py.path_tracking import ControllerPurePursuit
 
 class Nav2Processing:
     def __init__(self, ros_communicator:RosCommunicator, data_processor:DataProcessor):
@@ -21,7 +22,6 @@ class Nav2Processing:
         self.recordFlag = 0
         self.goal_published_flag = False
         self.path_planner = None
-        self.first_nav = True
 
     def reset_nav_process(self):
         self.finishFlag = False
@@ -275,38 +275,84 @@ class Nav2Processing:
             action = "COUNTERCLOCKWISE_ROTATION"
         return action
 
-    def fix_living_room_nav(self):
-        if self.first_nav:
-            # TODO:Load map and map config map.pgm / map.yaml
-            self.path_planner = PlannerRRTStar(MapLoader("/workspaces/src/pros_car_py/config/living_room"))
-            self.ros_communicator.publish_aruco_marker_config(
-                self.path_planner.maploader.unflipped_ids,
-                self.path_planner.maploader.aruco_config)
-            self.first_nav = False
+    def random_living_room_nav(self):
+        
+        self.path_planner = PlannerRRTStar(MapLoader("/workspaces/src/pros_car_py/config/living_room"))
+        controller = ControllerPurePursuit()
+        self.ros_communicator.publish_aruco_marker_config(
+            self.path_planner.maploader.unflipped_ids,
+            self.path_planner.maploader.aruco_config)
+        # Debug
+        data = []
+        for row in self.path_planner.maploader.map:
+            for pixel in row:
+                occ = 100 if pixel < self.path_planner.maploader.occupied_thresh * 255 else 0
+                data.append(occ)
+        self.ros_communicator.publish_map(
+            data, self.path_planner.maploader.origin, self.path_planner.maploader.resolution,
+                self.path_planner.maploader.width, self.path_planner.maploader.height)
+            
+        while(not self.data_processor.get_aruco_estimate_pose()): yield "STOP"
+        ## For Testing
+        # if self.data_processor.get_aruco_estimate_pose():
+        #     print("cal path")
+        #     path = self.path_planner.planning(self.data_processor.get_aruco_estimate_pose(), (2.0, 3.0))
+        #     print("pub path")
+        #     self.ros_communicator.publish_plan(path)
 
-        # target_list = [(2.310, 6.440)]
-        # for target in target_list:
-        #     self.path_planner.planning(self.data_processor.get_aruco_estimate_pose(), target)
-        #     self.data_processor.pub_path(self.path_planner.path)
-        #     while cal_distance(target, pose) < 1.0 : # meter
-        #         pose = self.data_processor.get_aruco_estimate_pose()
-        #         min_idx, min_dist = search_nearest(self.path_planner.path, (x,y))
-        #         target = self.path_planner.path[min_idx]
-        #         car_yaw = get_yaw_from_quaternion(
-        #             car_orientation_z, car_orientation_w
-        #         )
-        #         ang = np.arctan2(self.path_planner.path[min_idx][1]-pose.y, self.path_planner.path[min_idx][0]-pose.x)
-        #         diff_angle = (ang - car_yaw) % 360.0
-        #         if diff_angle < 30.0 or (diff_angle > 330 and diff_angle < 360):
-        #             action_key = "FORWARD"
-        #         elif diff_angle > 30.0 and diff_angle < 180.0:
-        #             action_key = "COUNTERCLOCKWISE_ROTATION"
-        #         elif diff_angle > 180.0 and diff_angle < 330.0:
-        #             action_key = "CLOCKWISE_ROTATION"
-        #         else:
-        #             action_key = "STOP"
-        #         yield action_key
-        #         pose = self.data_processor.get_aruco_estimate_pose()
+        target_list = [(2.0, 3.0)]
+        for target in target_list:
+            pose = self.data_processor.get_aruco_estimate_pose()
+            count = 0
+            while(not self.path_planner.path):
+                self.path_planner.planning((pose["x"], pose["y"]), target)
+                count += 1
+                if count < 10:
+                    continue
+            self.ros_communicator.publish_plan(self.path_planner.path)
+            controller.path = np.array(self.path_planner.path)
+            while True:
+                pose = self.data_processor.get_aruco_estimate_pose()
+                robot_pos = np.array([pose["x"], pose["y"]])
+                robot_yaw = get_yaw_from_quaternion(pose["qz"], pose["qw"])  # in radians
+                robot_v = 5.0  # assume forward velocity constant or from odom
+
+                omega, target = controller.feedback(
+                    x=robot_pos[0], y=robot_pos[1], yaw=robot_yaw, v=robot_v
+                )
+                self.ros_communicator.publish_selected_target_marker(target[0],target[1])
+                if target is None:
+                    print("[Pure Pursuit] No target found")
+                    yield [0.0, 0.0, 0.0, 0.0]
+                    break
+
+                end_dist = np.linalg.norm(robot_pos - controller.path[-1])
+                if end_dist < 1.0:
+                    print("[Pure Pursuit] Goal reached")
+                    yield [0.0, 0.0, 0.0, 0.0]
+                    break
+
+                # Calculate wheel velocity from diff-drive
+                wheel_radius = 0.04  # meters
+                wheel_base = 0.23    # meters
+                v = robot_v  # base linear speed [m/s]
+                # omega = np.clip(omega, -3.0, 3.0)  # limit angular speed
+                omega = np.rad2deg(omega)
+                print(omega)
+                
+                v_l = v - (omega * wheel_base / 2.0)
+                v_r = v + (omega * wheel_base / 2.0)
+
+                # Convert to wheel rotation speed (m/s -> deg/s)
+                to_deg = lambda vel: (vel / wheel_radius) * (180.0 / np.pi)
+                deg_l = to_deg(v_l)
+                deg_r = to_deg(v_r)
+
+                action = [v_l, v_r, v_l, v_r]
+                print(f"[Pure Pursuit] omega={omega:.2f}, deg_l={deg_l:.1f}, deg_r={deg_r:.1f}, target={target}")
+                yield action
+
+                pose = self.data_processor.get_aruco_estimate_pose()
         return "STOP"
 
 

@@ -44,6 +44,49 @@ class MapLoader:
         self.map = cv2.flip(img, 0)
         self.height, self.width = self.map.shape
 
+    def position_to_pixel(self, position):
+        """
+        position: (x, y) in meters
+        return: (u, v) in pixels
+        """
+        x, y = position
+        u = int((x - self.origin[0]) / self.resolution)
+        v = int((y - self.origin[1]) / self.resolution)
+
+        v = self.height - v
+        return (u, v)
+
+    
+    def pixel_to_position(self, pixel):
+        """
+        pixel: (u, v) in pixels
+        return: (x, y) in meters
+        """
+        u, v = pixel
+        v = self.height - v
+        x = u * self.resolution + self.origin[0]
+        y = v * self.resolution + self.origin[1]
+        return (x, y)
+    
+def search_nearest(path, pos):
+    """
+    path: list of (x, y) or numpy array shape=(N, 2)
+    pos: (x, y)
+    return: (index, squared_distance)
+    """
+    path = np.array(path)  # 保證是 np.ndarray
+
+    min_dist = float('inf')
+    min_id = -1
+
+    for i in range(path.shape[0]):
+        dist = (pos[0] - path[i, 0]) ** 2 + (pos[1] - path[i, 1]) ** 2
+        if dist < min_dist:
+            min_dist = dist
+            min_id = i
+
+    return min_id, min_dist
+
 def Bresenham(x0, x1, y0, y1):
     rec = []
     dx = abs(x1 - x0)
@@ -82,19 +125,15 @@ class Planner:
     def __init__(self, maploader:MapLoader):
         self.maploader = maploader
 
-    def position_to_pixel(self, position):
-        return position
-    def pixel_to_position(self, pixel):
-        return pixel
-
     @abc.abstractmethod
     def planning(self, start, goal):
         return NotImplementedError
 
 class PlannerRRTStar(Planner):
-    def __init__(self, maploader:MapLoader, extend_len=20):
+    def __init__(self, maploader:MapLoader, extend_len=5):
         super().__init__(maploader)
         self.extend_len = extend_len 
+        self.path = None
 
     def _random_node(self, goal, shape):
         r = np.random.choice(2,1,p=[0.5,0.5])
@@ -120,7 +159,7 @@ class PlannerRRTStar(Planner):
         n2_ = pos_int(n2)
         line = Bresenham(n1_[0], n2_[0], n1_[1], n2_[1])
         for pts in line:
-            if self.map[int(pts[1]),int(pts[0])]<0.5:
+            if self.maploader.map[int(pts[1]),int(pts[0])]<0.5:
                 return True
         return False
 
@@ -131,7 +170,7 @@ class PlannerRRTStar(Planner):
         if extend_len > v_len:
             extend_len = v_len
         new_node = (from_node[0]+extend_len*np.cos(v_theta), from_node[1]+extend_len*np.sin(v_theta))
-        if new_node[1]<0 or new_node[1]>=self.map.shape[0] or new_node[0]<0 or new_node[0]>=self.map.shape[1] or self._check_collision(from_node, new_node):
+        if new_node[1]<0 or new_node[1]>=self.maploader.map.shape[0] or new_node[0]<0 or new_node[0]>=self.maploader.map.shape[1] or self._check_collision(from_node, new_node):
             return False, None
         else:        
             return new_node, distance(new_node, from_node)
@@ -145,21 +184,22 @@ class PlannerRRTStar(Planner):
     def planning(self, start, goal, extend_len=None, img=None):
         if extend_len is None:
             extend_len = self.extend_len
+        # >> map coordinate
+        start = self.maploader.position_to_pixel(start)
+        goal = self.maploader.position_to_pixel(goal)
+
+        # >> RRT start in pixel level
         self.ntree = {}
         self.ntree[start] = None
         self.cost = {}
         self.cost[start] = 0
         goal_node = None
-        for it in range(2000000): # 20000
-            #print("\r", it, len(self.ntree), end="")
-            samp_node = self._random_node(goal, self.map.shape)
+        for it in range(2000): # 20000
+            print("\r", it, len(self.ntree), end="")
+            samp_node = self._random_node(goal, self.maploader.map.shape)
             near_node = self._nearest_node(samp_node)
             new_node, cost = self._steer(near_node, samp_node, extend_len)
             if new_node is not False:
-                # self.ntree[new_node] = near_node
-                # self.cost[new_node] = cost + self.cost[near_node]
-
-                # TODO: Re-Parent & Re-Wire
                 # Re-Parent
                 near_list = self._search_near_node(new_node, extend_len*3)
                 best_parent = near_node
@@ -183,18 +223,18 @@ class PlannerRRTStar(Planner):
                         self.cost[node] = new_cost
             else:
                 continue
+            
             if distance(new_node, goal) < extend_len:
                 goal_node = new_node
                 break
 
-        # Extract Path
+        # >> Extract Path
         path = []
         n = goal_node
-        while(True):
-            if n is None:
-                break
-            path.insert(0,n)
-            node = self.ntree[n]
-            n = self.ntree[n] 
+        while n is not None:
+            path.insert(0, n)
+            n = self.ntree[n]
         path.append(goal)
-        return path
+        # print(path)
+
+        self.path = [self.maploader.pixel_to_position(p) for p in path]

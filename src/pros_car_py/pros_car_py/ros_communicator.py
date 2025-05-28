@@ -2,7 +2,7 @@ from rclpy.node import Node
 from pros_car_py.car_models import DeviceDataTypeEnum, CarCControl
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, Point
 from std_msgs.msg import String, Header
-from nav_msgs.msg import Path
+from nav_msgs.msg import Path, OccupancyGrid
 from sensor_msgs.msg import LaserScan, Imu
 from trajectory_msgs.msg import JointTrajectoryPoint
 import orjson
@@ -15,7 +15,7 @@ from nav2_msgs.srv import ClearEntireCostmap
 from rclpy.action import ActionClient
 from nav2_msgs.action import NavigateToPose
 import rclpy
-from interfaces_pkg.msg import ArucoMarker, ArucoMarkerConfig
+from interfaces_pkg.msg import ArucoMarkerConfig, ArucoMarker
 
 class RosCommunicator(Node):
     def __init__(self):
@@ -92,6 +92,7 @@ class RosCommunicator(Node):
             10,
         )
 
+        self.latest_aruco_estimate_pose = None
         self.aruco_estimate_pose_sub = self.create_subscription(
             PoseWithCovarianceStamped, '/aruco_detector/pose', 
             self.aruco_estimate_pose_callback, 10
@@ -134,6 +135,11 @@ class RosCommunicator(Node):
         self.publisher_ArucoMarkerConfig = self.create_publisher(
             ArucoMarkerConfig, "/aruco_marker/config", 10
         )
+
+        self.publisher_ArucoMarkerConfig = self.create_publisher(
+            ArucoMarkerConfig, "/aruco_marker/config", 10
+        )
+        self.publisher_map = self.create_publisher(OccupancyGrid, '/map', 10)
 
         # 創清除 costmap Service
         self.clear_global_costmap_client = self.create_client(
@@ -186,6 +192,41 @@ class RosCommunicator(Node):
         self.clear_plan()
         self.get_logger().info("Nav2 Reset Completed")
 
+    def publish_plan(self, path: list):
+        msg_path = Path()
+        msg_path.header.frame_id = "map"
+        msg_path.header.stamp = self.get_clock().now().to_msg()
+
+        for x, y in path:
+            pose = PoseStamped()
+            pose.header.frame_id = "map"
+            pose.header.stamp = self.get_clock().now().to_msg()
+
+            pose.pose.position.x = x
+            pose.pose.position.y = y
+            pose.pose.position.z = 0.0
+            pose.pose.orientation.w = 1.0 
+
+            msg_path.poses.append(pose)
+
+        self.publisher_plan.publish(msg_path)
+        self.get_logger().info(f"Published Path with {len(path)} points to /plan")
+
+    def publish_map(self, map_data, origin, resolution, w, h):
+        map_msg = OccupancyGrid()
+        map_msg.header = Header()
+        map_msg.info.resolution = resolution
+        map_msg.info.width = w
+        map_msg.info.height = h
+        map_msg.info.origin.position.x = origin[0]
+        map_msg.info.origin.position.y = origin[1]
+        map_msg.info.origin.position.z = 0.0
+        map_msg.info.origin.orientation.w = 1.0
+        map_msg.data = map_data
+        map_msg.header.stamp = self.get_clock().now().to_msg()
+        map_msg.header.frame_id = "map"  
+        self.publisher_map.publish(map_msg)
+
     def aruco_estimate_pose_callback(self, msg):
         self.latest_aruco_estimate_pose = msg
         
@@ -231,18 +272,30 @@ class RosCommunicator(Node):
             return None
         return self.latest_received_global_plan
 
-    def publish_car_control(self, action_key, publish_rear=True, publish_front=True):
+    def publish_car_control(self, action_key: str | list, publish_rear=True, publish_front=True):
         msg = Float32MultiArray()
-        if action_key not in ACTION_MAPPINGS:
-            # print("action error")
+
+        if isinstance(action_key, str):
+            if action_key not in ACTION_MAPPINGS:
+                print("[ERROR] Invalid action key:", action_key)
+                return
+            velocities = ACTION_MAPPINGS[action_key]
+            self._vel1, self._vel2, self._vel3, self._vel4 = velocities
+
+ 
+        elif isinstance(action_key, list) and len(action_key) == 4:
+            self._vel1, self._vel2, self._vel3, self._vel4 = action_key
+
+        else:
+            print("[ERROR] action_key should be a valid string or list of 4 values")
             return
-        velocities = ACTION_MAPPINGS[action_key]
-        self._vel1, self._vel2, self._vel3, self._vel4 = velocities
-        msg.data = [self._vel1, self._vel2]
-        if publish_rear == True:
+
+        if publish_rear:
+            msg.data = [self._vel1, self._vel2]
             self.publisher_rear.publish(msg)
-        msg.data = [self._vel3, self._vel4]
-        if publish_front == True:
+
+        if publish_front:
+            msg.data = [self._vel3, self._vel4]
             self.publisher_forward.publish(msg)
 
     # publish goal_pose
@@ -373,8 +426,17 @@ class RosCommunicator(Node):
 
         self.publisher_target_marker.publish(marker)
     
-    def publish_aruco_marker_config(
-            unflipped_ids:list,
-            aruco_config:dict
-    ):
-        pass
+    def publish_aruco_marker_config(self, unflipped_ids: list, aruco_config: dict):
+        config = ArucoMarkerConfig()
+
+        for marker_id, pose in aruco_config.items():
+            marker = ArucoMarker()
+            marker.id = marker_id
+            marker.x = pose['x']
+            marker.y = pose['y']
+            marker.theta = pose['theta']
+            config.markers.append(marker)
+
+        config.unflipped_ids = unflipped_ids
+
+        self.publisher_ArucoMarkerConfig.publish(config)

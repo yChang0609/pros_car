@@ -15,8 +15,23 @@ class DataProcessor:
         self.ros_communicator = ros_communicator
 
     def get_aruco_estimate_pose(self):
-        pose = self.ros_communicator.get_aruco_estimate_pose()
-        return pose
+        if not self.ros_communicator.get_aruco_estimate_pose():
+            return None
+        pose_msg = self.ros_communicator.get_aruco_estimate_pose()
+
+        pos = pose_msg.pose.pose.position
+        ori = pose_msg.pose.pose.orientation
+
+        return {
+            "x": pos.x,
+            "y": pos.y,
+            "z": pos.z,
+            "qx": ori.x,
+            "qy": ori.y,
+            "qz": ori.z,
+            "qw": ori.w
+        }
+    
     def get_processed_amcl_pose(self):
         amcl_pose_msg = self.ros_communicator.get_latest_amcl_pose()
         position = amcl_pose_msg.pose.pose.position

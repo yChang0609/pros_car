@@ -299,6 +299,30 @@ class Nav2Processing:
         #     path = self.path_planner.planning(self.data_processor.get_aruco_estimate_pose(), (2.0, 3.0))
         #     print("pub path")
         #     self.ros_communicator.publish_plan(path)
+        
+        
+        ## >> TODO follow pseudo code 
+        # # Loop until:
+        # # - YOLO detects Pikachu
+        # # - Pikachu is centered in the camera view
+        # # - ArUco marker with ID 9 (frontier) is detected
+        
+        # while (
+        #     YOLO_result.detected == False and
+        #     YOLO_result.image_position != image_center and
+        #     not ArUco_has_detected(ID=9)
+        # ):
+        #     yield turn_right()  # Keep turning right to search for Pikachu
+
+        # # Once the above loop breaks (i.e., a condition is met):
+        # # Use robot's current pose to determine the goal from a predefined map or dictionary
+        # goal = goal_dictionary.search(robot_pose)
+
+        # # Plan a path to the goal
+        # planned_path = path_planning(current_pose, goal)
+
+        # # Follow the planned path
+        # path_tracking(planned_path)
 
         target_list = [(2.0, 3.0)]
         for target in target_list:
@@ -337,19 +361,17 @@ class Nav2Processing:
                 wheel_base = 0.23    # meters
                 v = robot_v  # base linear speed [m/s]
                 # omega = np.clip(omega, -3.0, 3.0)  # limit angular speed
-                omega = np.rad2deg(omega)
-                print(omega)
-                
+                # omega = np.rad2deg(omega)
                 v_l = v - (omega * wheel_base / 2.0)
                 v_r = v + (omega * wheel_base / 2.0)
 
                 # Convert to wheel rotation speed (m/s -> deg/s)
-                to_deg = lambda vel: (vel / wheel_radius) * (180.0 / np.pi)
-                deg_l = to_deg(v_l)
-                deg_r = to_deg(v_r)
+                to_rad = lambda vel: vel / wheel_radius
+                rad_l = to_rad(v_l)
+                rad_r = to_rad(v_r)
 
-                action = [v_l, v_r, v_l, v_r]
-                print(f"[Pure Pursuit] omega={omega:.2f}, deg_l={deg_l:.1f}, deg_r={deg_r:.1f}, target={target}")
+                action = [rad_l, rad_r, rad_l, rad_r]
+                print(f"[Pure Pursuit] omega={omega:.2f}, deg_l={rad_l:.1f}, deg_r={rad_r:.1f}, target={target}")
                 yield action
 
                 pose = self.data_processor.get_aruco_estimate_pose()

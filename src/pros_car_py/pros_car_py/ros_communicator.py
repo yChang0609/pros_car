@@ -99,8 +99,9 @@ class RosCommunicator(Node):
         )
 
         # >> Publisher
-
+        
         # publish car_C_rear_wheel and car_C_front_wheel
+        self._vel1, self._vel2, self._vel3, self._vel4 = 0.0, 0.0, 0.0, 0.0
         self.publisher_rear = self.create_publisher(
             Float32MultiArray, DeviceDataTypeEnum.car_C_rear_wheel, 10
         )
@@ -279,7 +280,10 @@ class RosCommunicator(Node):
             if action_key not in ACTION_MAPPINGS:
                 print("[ERROR] Invalid action key:", action_key)
                 return
+            
             velocities = ACTION_MAPPINGS[action_key]
+            if  [self._vel1, self._vel2, self._vel3, self._vel4] ==  velocities:
+                return
             self._vel1, self._vel2, self._vel3, self._vel4 = velocities
 
  

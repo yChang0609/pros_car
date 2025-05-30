@@ -8,8 +8,9 @@ from pros_car_py.nav2_utils import (
 import numpy as np
 from pros_car_py.data_processor import DataProcessor
 from pros_car_py.ros_communicator import RosCommunicator
-from pros_car_py.path_planing import PlannerRRTStar, MapLoader
-from pros_car_py.path_tracking import ControllerPurePursuit
+from pros_car_py.path_modules.path_planing import PlannerRRTStar, PlannerAStar, MapLoader
+from pros_car_py.path_modules.path_tracking import ControllerPurePursuit
+import time
 
 class Nav2Processing:
     def __init__(self, ros_communicator:RosCommunicator, data_processor:DataProcessor):
@@ -21,7 +22,6 @@ class Nav2Processing:
         self.index_length = 0
         self.recordFlag = 0
         self.goal_published_flag = False
-        self.path_planner = None
 
     def reset_nav_process(self):
         self.finishFlag = False
@@ -275,107 +275,231 @@ class Nav2Processing:
             action = "COUNTERCLOCKWISE_ROTATION"
         return action
 
+    def test_loop(self):
+        start = time.time() 
+        while True:
+            diff = time.time() - start
+            if diff < 1.0:
+                yield "CLOCKWISE_ROTATION"
+            elif diff < 4.0:
+                yield "FORWARD"
+            elif diff < 7.0:
+                yield "CLOCKWISE_ROTATION"
+            elif diff < 15.0:
+                yield "FORWARD"
+            else:
+                yield "STOP"
+    
+
     def random_living_room_nav(self):
         
-        self.path_planner = PlannerRRTStar(MapLoader("/workspaces/src/pros_car_py/config/living_room"))
+        path_planner = PlannerAStar(MapLoader("/workspaces/src/pros_car_py/config/living_room"))
         controller = ControllerPurePursuit()
         self.ros_communicator.publish_aruco_marker_config(
-            self.path_planner.maploader.unflipped_ids,
-            self.path_planner.maploader.aruco_config)
+            path_planner.maploader.unflipped_ids,
+            path_planner.maploader.aruco_config)
+        
         # Debug
         data = []
-        for row in self.path_planner.maploader.map:
+        for row in path_planner.maploader.map:
             for pixel in row:
-                occ = 100 if pixel < self.path_planner.maploader.occupied_thresh * 255 else 0
+                occ = 100 if pixel < path_planner.maploader.occupied_thresh * 255 else 0
                 data.append(occ)
         self.ros_communicator.publish_map(
-            data, self.path_planner.maploader.origin, self.path_planner.maploader.resolution,
-                self.path_planner.maploader.width, self.path_planner.maploader.height)
+            data, path_planner.maploader.origin, path_planner.maploader.resolution,
+                path_planner.maploader.width, path_planner.maploader.height)
             
         while(not self.data_processor.get_aruco_estimate_pose()): yield "STOP"
-        ## For Testing
-        # if self.data_processor.get_aruco_estimate_pose():
-        #     print("cal path")
-        #     path = self.path_planner.planning(self.data_processor.get_aruco_estimate_pose(), (2.0, 3.0))
-        #     print("pub path")
-        #     self.ros_communicator.publish_plan(path)
-        
-        
-        ## >> TODO follow pseudo code 
-        # # Loop until:
-        # # - YOLO detects Pikachu
-        # # - Pikachu is centered in the camera view
-        # # - ArUco marker with ID 9 (frontier) is detected
-        
-        # while (
-        #     YOLO_result.detected == False and
-        #     YOLO_result.image_position != image_center and
-        #     not ArUco_has_detected(ID=9)
-        # ):
-        #     yield turn_right()  # Keep turning right to search for Pikachu
 
-        # # Once the above loop breaks (i.e., a condition is met):
-        # # Use robot's current pose to determine the goal from a predefined map or dictionary
-        # goal = goal_dictionary.search(robot_pose)
-
+        # >> TODO apporch: 
+        # go 0 deg, 45 deg, 90 deg,thought detect aruco 9
+        # if 0 deg detect pickachu goal == g1
+        # if 45 deg detect pickachu goal == g2
+        # if 90 deg detect pickachu goal == g3
         # # Plan a path to the goal
         # planned_path = path_planning(current_pose, goal)
 
         # # Follow the planned path
         # path_tracking(planned_path)
+        
+        # trun around and go place pikachu on image center 
+        # select subgoal 
 
-        target_list = [(2.0, 3.0)]
-        for target in target_list:
-            pose = self.data_processor.get_aruco_estimate_pose()
-            count = 0
-            while(not self.path_planner.path):
-                self.path_planner.planning((pose["x"], pose["y"]), target)
-                count += 1
-                if count < 10:
-                    continue
-            self.ros_communicator.publish_plan(self.path_planner.path)
-            controller.path = np.array(self.path_planner.path)
+        # set goal
+        angles = [0, 45, 90]
+        goal_map = {
+            0: (2.0, 0.0),
+            45: (2.0, 3.0),
+            90: (0.0, 4.0),
+        }
+
+        # >> detect 3 direction 
+        detected_angle = None
+        for angle in angles:
+            # Rotate to the target angle
             while True:
                 pose = self.data_processor.get_aruco_estimate_pose()
-                robot_pos = np.array([pose["x"], pose["y"]])
-                robot_yaw = get_yaw_from_quaternion(pose["qz"], pose["qw"])  # in radians
-                robot_v = 5.0  # assume forward velocity constant or from odom
+                current_yaw_deg = get_yaw_from_quaternion(pose["qz"], pose["qw"])
+                diff = (angle - current_yaw_deg + 180) % 360 - 180
 
-                omega, target = controller.feedback(
-                    x=robot_pos[0], y=robot_pos[1], yaw=robot_yaw, v=robot_v
-                )
-                self.ros_communicator.publish_selected_target_marker(target[0],target[1])
-                if target is None:
-                    print("[Pure Pursuit] No target found")
+                if abs(diff) < 1.0:
                     yield [0.0, 0.0, 0.0, 0.0]
+                    print(f"[Rotate] Reached target angle {angle}")
                     break
 
-                end_dist = np.linalg.norm(robot_pos - controller.path[-1])
-                if end_dist < 1.0:
-                    print("[Pure Pursuit] Goal reached")
-                    yield [0.0, 0.0, 0.0, 0.0]
-                    break
+                base_speed = 5.0
+                k_p = 0.1
+                turn_speed = np.clip(base_speed + k_p * diff, -base_speed, base_speed)
 
-                # Calculate wheel velocity from diff-drive
-                wheel_radius = 0.04  # meters
-                wheel_base = 0.23    # meters
-                v = robot_v  # base linear speed [m/s]
-                # omega = np.clip(omega, -3.0, 3.0)  # limit angular speed
-                # omega = np.rad2deg(omega)
-                v_l = v - (omega * wheel_base / 2.0)
-                v_r = v + (omega * wheel_base / 2.0)
-
-                # Convert to wheel rotation speed (m/s -> deg/s)
-                to_rad = lambda vel: vel / wheel_radius
-                rad_l = to_rad(v_l)
-                rad_r = to_rad(v_r)
-
-                action = [rad_l, rad_r, rad_l, rad_r]
-                print(f"[Pure Pursuit] omega={omega:.2f}, deg_l={rad_l:.1f}, deg_r={rad_r:.1f}, target={target}")
+                left_speed = -turn_speed
+                right_speed = turn_speed
+                action = [left_speed, right_speed, left_speed, right_speed]
                 yield action
 
-                pose = self.data_processor.get_aruco_estimate_pose()
-        return "STOP"
+            # Detect Pikachu
+            image = self.data_processor.get_latest_image()
+            is_detected, cx = self.ros_communicator.detect_pikachu(image, (0, image.shape[1]))
+            if is_detected:
+                detected_angle = angle
+                print(f"[Detect] Pikachu detected at {angle} deg")
+                break
+            else:
+                print(f"[Detect] No Pikachu at {angle} deg")
+
+        if detected_angle is not None:
+            goal = goal_map[detected_angle]
+        else:
+            # >> to center point 
+            goal = goal_map[45] 
+        
+        if detected_angle == 90:
+            while True:
+                image = self.data_processor.get_latest_image()
+                is_detected, cx = self.ros_communicator.detect_pikachu(image, (0, image.shape[1]))
+                if is_detected:
+                    forward = 5.0
+                    yield [forward, forward, forward, forward]
+                else:
+                    while True: 
+                        print("[Pokemon] gotcha pikachu!!!!")
+                        yield [0.0, 0.0, 0.0, 0.0]
+
+        # Plan and track
+        pose = self.data_processor.get_aruco_estimate_pose()
+        path_planner.planning((pose["x"], pose["y"]), goal)
+        self.ros_communicator.publish_plan(path_planner.path)
+        controller.path = np.array(path_planner.path)
+
+        while True:
+            pose = self.data_processor.get_aruco_estimate_pose()
+            robot_pos = np.array([pose["x"], pose["y"]])
+            robot_yaw = get_yaw_from_quaternion(pose["qz"], pose["qw"])
+            robot_v = 1.0
+
+            omega, target = controller.feedback(
+                x=robot_pos[0], y=robot_pos[1], yaw=np.deg2rad(robot_yaw), v=robot_v
+            )
+            self.ros_communicator.publish_selected_target_marker(target[0], target[1])
+            if target is None or np.linalg.norm(robot_pos - controller.path[-1][:2]) < 0.1:
+                break
+
+            # Compute wheel command
+            v_base = 10.0
+            omega_gain = 20.0
+            turn_adjust = omega * omega_gain
+            v_l = v_base - turn_adjust
+            v_r = v_base + turn_adjust
+            yield [v_l, v_r, v_l, v_r]
+            
+        # Final adjustment (face Pikachu)
+        while True:
+            image = self.data_processor.get_latest_image()
+            is_detected, position = self.ros_communicator.detect_pikachu(image, (0, image.shape[1]))
+            print(position)
+            error = image.shape[1] // 2  - position.x
+
+            if not is_detected:
+                rotate = 8.0
+                yield [-rotate, rotate, -rotate, rotate]
+                continue
+
+            if abs(error) < 10:
+                yield [0.0, 0.0, 0.0, 0.0]
+                break
+
+            # Simple P controller to align
+            k_p = 0.01
+            base_speed = 5.0
+            correction = base_speed + error * k_p
+            v_l = -correction
+            v_r = correction
+            yield [v_l, v_r, v_l, v_r]
+
+        while True:
+            image = self.data_processor.get_latest_image()
+            is_detected, cx = self.ros_communicator.detect_pikachu(image, (0, image.shape[1]))
+            if is_detected:
+                forward = 5.0
+                yield [forward, forward, forward, forward]
+            else:
+                while True: 
+                    print("[Pokemon] gotcha pikachu!!!!")
+                    yield [0.0, 0.0, 0.0, 0.0]
+
+
+
+        # # >> TEST try path planning and tarcking 
+        # target_list = [(2.57, 1.84)]
+        # for target in target_list:
+        #     pose = self.data_processor.get_aruco_estimate_pose()
+        #     count = 0
+        #     while(path_planner.path.shape[0] <= 1):
+        #         print("Replanning")
+        #         path_planner.planning((pose["x"], pose["y"]), target)
+        #         count += 1
+        #         yield [0.0, 0.0, 0.0, 0.0]
+        #         if count < 10:
+        #             continue
+        #         else:
+        #             return
+        #     self.ros_communicator.publish_plan(path_planner.path)
+        #     controller.path = np.array(path_planner.path)
+        #     while True:
+        #         pose = self.data_processor.get_aruco_estimate_pose()
+        #         robot_pos = np.array([pose["x"], pose["y"]])
+        #         robot_yaw = get_yaw_from_quaternion(pose["qz"], pose["qw"])  # in radians
+        #         robot_v = 1.0  # normalized base speed for control
+        #         # print(f"robot_yaw:{np.rad2deg(robot_yaw)}")
+        #         omega, target = controller.feedback(
+        #             x=robot_pos[0], y=robot_pos[1], yaw=np.deg2rad(robot_yaw), v=robot_v
+        #         )
+        #         self.ros_communicator.publish_selected_target_marker(target[0], target[1])
+        #         if target is None:
+        #             print("[Pure Pursuit] No target found")
+        #             yield [0.0, 0.0, 0.0, 0.0]
+        #             break
+
+        #         end_dist = np.linalg.norm(robot_pos - controller.path[-1][:2])
+        #         if end_dist < 0.05:
+        #             break
+
+        #         v_base = 10.0
+        #         omega_gain = 20.0
+        #         turn_adjust = omega * omega_gain
+
+        #         v_l = v_base - turn_adjust
+        #         v_r = v_base + turn_adjust
+        #         # gain = robot_v
+        #         out_l , out_r = v_l, v_r
+        #         action = [out_l, out_r, out_l, out_r]
+        #         # print(f"[Pure Pursuit] omega={omega:.2f}, out_l={out_l:.1f}, out_r={out_r:.1f}, target={target}")
+        #         yield action
+
+        #         pose = self.data_processor.get_aruco_estimate_pose()
+        while True:
+            print("[Pure Pursuit] Goal reached")
+            yield [0.0, 0.0, 0.0, 0.0]
+        # return "STOP"
 
 
     def stop_nav(self):

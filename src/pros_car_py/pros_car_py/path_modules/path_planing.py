@@ -1,13 +1,63 @@
-# x=2.310, y=6.440, theta=1.571 rad
-
-import cv2
-import numpy as np
-import sys
-import abc
-
 import os
-import yaml
+import abc
 import cv2
+import yaml
+import heapq
+import numpy as np
+from pros_car_py.path_modules.cubic_spline import cubic_spline_2d
+
+def search_nearest(path, pos):
+    """
+    path: list of (x, y) or numpy array shape=(N, 2)
+    pos: (x, y)
+    return: (index, squared_distance)
+    """
+    path = np.array(path)  # 保證是 np.ndarray
+
+    min_dist = float('inf')
+    min_id = -1
+
+    for i in range(path.shape[0]):
+        dist = (pos[0] - path[i, 0]) ** 2 + (pos[1] - path[i, 1]) ** 2
+        if dist < min_dist:
+            min_dist = dist
+            min_id = i
+
+    return min_id, min_dist
+
+def Bresenham(x0, x1, y0, y1):
+    rec = []
+    dx = abs(x1 - x0)
+    dy = abs(y1 - y0)
+    x, y = x0, y0
+    sx = -1 if x0 > x1 else 1
+    sy = -1 if y0 > y1 else 1
+    if dx > dy:
+        err = dx / 2.0
+        while x != x1:
+            rec.append((x, y))
+            err -= dy
+            if err < 0:
+                y += sy
+                err += dx
+            x += sx
+    else:
+        err = dy / 2.0
+        while y != y1:
+            rec.append((x, y))
+            err -= dx
+            if err < 0:
+                x += sx
+                err += dy
+            y += sy
+    return rec
+
+def pos_int(p):
+    return (int(p[0]), int(p[1]))
+
+def distance(n1, n2):
+        d = np.array(n1) - np.array(n2)
+        return np.hypot(d[0], d[1])
 
 class MapLoader:
     def __init__(self, path):
@@ -67,73 +117,105 @@ class MapLoader:
         x = u * self.resolution + self.origin[0]
         y = v * self.resolution + self.origin[1]
         return (x, y)
-    
-def search_nearest(path, pos):
-    """
-    path: list of (x, y) or numpy array shape=(N, 2)
-    pos: (x, y)
-    return: (index, squared_distance)
-    """
-    path = np.array(path)  # 保證是 np.ndarray
-
-    min_dist = float('inf')
-    min_id = -1
-
-    for i in range(path.shape[0]):
-        dist = (pos[0] - path[i, 0]) ** 2 + (pos[1] - path[i, 1]) ** 2
-        if dist < min_dist:
-            min_dist = dist
-            min_id = i
-
-    return min_id, min_dist
-
-def Bresenham(x0, x1, y0, y1):
-    rec = []
-    dx = abs(x1 - x0)
-    dy = abs(y1 - y0)
-    x, y = x0, y0
-    sx = -1 if x0 > x1 else 1
-    sy = -1 if y0 > y1 else 1
-    if dx > dy:
-        err = dx / 2.0
-        while x != x1:
-            rec.append((x, y))
-            err -= dy
-            if err < 0:
-                y += sy
-                err += dx
-            x += sx
-    else:
-        err = dy / 2.0
-        while y != y1:
-            rec.append((x, y))
-            err -= dx
-            if err < 0:
-                x += sx
-                err += dy
-            y += sy
-    return rec
-
-def pos_int(p):
-    return (int(p[0]), int(p[1]))
-
-def distance(n1, n2):
-        d = np.array(n1) - np.array(n2)
-        return np.hypot(d[0], d[1])
 
 class Planner:
     def __init__(self, maploader:MapLoader):
         self.maploader = maploader
+        self.path = np.array([[0.0,0.0,0.0,0.0]])
 
     @abc.abstractmethod
     def planning(self, start, goal):
         return NotImplementedError
+    
+class PlannerAStar(Planner):
+    def __init__(self, maploader:MapLoader, inter=5):
+        super().__init__(maploader)
+        self.inter = inter
+        self.initialize()
 
+    def initialize(self):
+        self.queue = [] 
+        self.entry_finder = {} 
+        self.parent = {}
+        self.h = {} # Distance from start to node
+        self.g = {} # Distance from node to goal
+        self.goal_node = None
+
+    def _key_func(self, p):
+        return self.g[p] + self.h[p]
+    
+    def push_to_queue(self, node):
+        priority = self.g[node] + self.h[node]
+        if node not in self.entry_finder:
+            heapq.heappush(self.queue, (priority, node))
+            self.entry_finder[node] = True
+
+    def pop_from_queue(self):
+        while self.queue:
+            _, node = heapq.heappop(self.queue)
+            if node in self.entry_finder:
+                del self.entry_finder[node]
+                return node
+        return None
+
+    def planning(self, start=(100,200), goal=(375,520), inter=None, img=None):
+        if inter is None:
+            inter = self.inter
+        # >> map coordinate
+        start = self.maploader.position_to_pixel(start)
+        goal = self.maploader.position_to_pixel(goal)
+
+        # Initialize 
+        self.initialize()
+        self.g[start] = 0
+        self.h[start] = distance(start, goal)
+        self.parent[start] = None
+        self.push_to_queue(start)
+
+        while self.queue:
+            current_node = self.pop_from_queue()
+            if current_node is None:
+                break
+
+            if self.h[current_node] < inter:
+                self.goal_node = current_node
+                break
+
+            for dx in range(-inter, inter+1, inter):
+                for dy in range(-inter, inter+1, inter):
+                    nx = current_node[0] + dx
+                    ny = current_node[1] + dy
+                    neighbor = (nx,ny)
+                    if  0 <= nx < self.maploader.map.shape[1] and \
+                        0 <= ny <  self.maploader.map.shape[0] and \
+                        self.maploader.map[ny][nx] > 125:
+                        t_g = self.g[current_node] + inter #1
+                        if neighbor not in self.g or t_g < self.g[neighbor]:
+                            if img is not None: img[ny][nx] = (1,0,0)
+                            self.g[neighbor] = t_g
+                            self.h[neighbor] = distance(neighbor, goal)
+                            self.parent[neighbor] = current_node
+                            self.push_to_queue(neighbor)
+        
+        # Extract path
+        path = []
+        p = self.goal_node
+        if p is None:
+            return
+        while p is not None:
+            path.insert(0, p)
+            p = self.parent[p]
+        if path[-1] != goal:
+            path.append(goal)
+
+        path = cubic_spline_2d(path, interval=5) # get list[(x,y,yaw,curv)]
+        spilt_p = lambda p: [*self.maploader.pixel_to_position(p[:2]), p[2], p[3]]
+        self.path = np.array([spilt_p(p) for p in path])
+    
 class PlannerRRTStar(Planner):
     def __init__(self, maploader:MapLoader, extend_len=5):
         super().__init__(maploader)
         self.extend_len = extend_len 
-        self.path = None
 
     def _random_node(self, goal, shape):
         r = np.random.choice(2,1,p=[0.5,0.5])
@@ -159,7 +241,7 @@ class PlannerRRTStar(Planner):
         n2_ = pos_int(n2)
         line = Bresenham(n1_[0], n2_[0], n1_[1], n2_[1])
         for pts in line:
-            if self.maploader.map[int(pts[1]),int(pts[0])]<0.5:
+            if self.maploader.map[int(pts[1]),int(pts[0])] < 125:
                 return True
         return False
 
@@ -236,5 +318,8 @@ class PlannerRRTStar(Planner):
             n = self.ntree[n]
         path.append(goal)
         # print(path)
+        path = cubic_spline_2d(path, interval=2) # get list[(x,y,yaw,curv)]
+        spilt_p = lambda p: [*self.maploader.pixel_to_position(p[:2]), p[2], p[3]]
+        self.path = np.array([spilt_p(p) for p in path])
+        # self.path = np.array([self.maploader.pixel_to_position(p) for p in path])
 
-        self.path = [self.maploader.pixel_to_position(p) for p in path]

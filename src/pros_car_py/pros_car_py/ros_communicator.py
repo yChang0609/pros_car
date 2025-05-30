@@ -1,26 +1,49 @@
-from rclpy.node import Node
-from pros_car_py.car_models import DeviceDataTypeEnum, CarCControl
-from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, Point
-from std_msgs.msg import String, Header
-from nav_msgs.msg import Path, OccupancyGrid
-from sensor_msgs.msg import LaserScan, Imu
-from trajectory_msgs.msg import JointTrajectoryPoint
-import orjson
-from pros_car_py.ros_communicator_config import ACTION_MAPPINGS
-from geometry_msgs.msg import PointStamped
-from std_msgs.msg import String, Bool
-from std_msgs.msg import Float32MultiArray
-from visualization_msgs.msg import Marker
-from nav2_msgs.srv import ClearEntireCostmap
-from rclpy.action import ActionClient
-from nav2_msgs.action import NavigateToPose
-import rclpy
-from interfaces_pkg.msg import ArucoMarkerConfig, ArucoMarker
+# ========== Standard & Third-Party Libraries ==========
+import orjson  # High-performance JSON serialization/deserialization
+import numpy as np  # Numerical operations, linear algebra, arrays
+from scipy.spatial.transform import Rotation 
+
+# ========== ROS2 Core Components ==========
+from rclpy.node import Node  # Base class for creating ROS2 nodes
+from cv_bridge import CvBridge
+from rclpy.action import ActionClient  # Interface for sending ROS2 actions (e.g. navigation goals)
+
+# ========== ROS2 Message Types ==========
+# --- Standard Messages ---
+from std_msgs.msg import String, Bool, Float32MultiArray, Header  # Basic message types (string, boolean, array)
+
+# --- Geometry-related Messages ---
+from geometry_msgs.msg import (
+    PoseWithCovarianceStamped,  # Pose with uncertainty (often used for localization)
+    PoseStamped,                # Stamped pose
+    Point,                      # 3D point
+    PointStamped                # Point with a header (timestamp + frame_id)
+)
+
+# --- Sensor Data Messages ---
+from sensor_msgs.msg import LaserScan, Imu, CompressedImage  # LIDAR scan and inertial measurement unit data
+
+# --- Navigation and Map Messages ---
+from nav_msgs.msg import Path, OccupancyGrid  # Path planning and occupancy grid (map)
+from nav2_msgs.srv import ClearEntireCostmap  # Service to clear navigation costmap
+from nav2_msgs.action import NavigateToPose   # Action for navigating to a specific pose
+
+# --- Trajectory and Visualization ---
+from trajectory_msgs.msg import JointTrajectoryPoint  # Used for joint-based motion
+from visualization_msgs.msg import Marker  # For RViz marker visualization
+
+# ========== Custom Project Modules ==========
+from pros_car_py.car_models import DeviceDataTypeEnum, CarCControl  # Custom car model enums and control interface
+from pros_car_py.ros_communicator_config import ACTION_MAPPINGS     # Custom-defined action mappings for robot control
+
+# ========== Custom Interface Messages ==========
+from interfaces_pkg.msg import ArucoMarkerConfig, ArucoMarker  # Marker configuration and detection messages
+from interfaces_pkg.srv import PikachuDetect
 
 class RosCommunicator(Node):
     def __init__(self):
         super().__init__("RosCommunicator")
-        
+        self.bridge = CvBridge()
         # >> Subscriber 
         # subscribeamcl_pose
         self.latest_amcl_pose = None
@@ -98,8 +121,19 @@ class RosCommunicator(Node):
             self.aruco_estimate_pose_callback, 10
         )
 
-        # >> Publisher
+        self.yolo_detect_results = None
+        self.aruco_estimate_pose_sub = self.create_subscription(
+            PoseWithCovarianceStamped, '/yolo_detector/results', 
+            self.aruco_estimate_pose_callback, 10
+        )
+
+        self.latest_image_msg = None
+        self.subscription = self.create_subscription(
+            CompressedImage,
+            '/camera/image/compressed',
+            self.subscriber_image_callback, 10)
         
+        # >> Publisher
         # publish car_C_rear_wheel and car_C_front_wheel
         self._vel1, self._vel2, self._vel3, self._vel4 = 0.0, 0.0, 0.0, 0.0
         self.publisher_rear = self.create_publisher(
@@ -142,6 +176,7 @@ class RosCommunicator(Node):
         )
         self.publisher_map = self.create_publisher(OccupancyGrid, '/map', 10)
 
+        
         # 創清除 costmap Service
         self.clear_global_costmap_client = self.create_client(
             ClearEntireCostmap, "/global_costmap/clear"
@@ -155,16 +190,14 @@ class RosCommunicator(Node):
         )
         self.publisher_plan = self.create_publisher(Path, "/plan", 10)
 
-        self.clear_global_costmap_client = self.create_client(
-            ClearEntireCostmap, "/global_costmap/clear"
-        )
-        self.clear_local_costmap_client = self.create_client(
-            ClearEntireCostmap, "/local_costmap/clear"
-        )
+
 
         self.navigate_to_pose_action_client = ActionClient(
             self, NavigateToPose, "/navigate_to_pose"
         )
+
+        # >> YOLO service
+        self.yolo_detect_client = self.create_client(PikachuDetect, 'detect_pikachu')
 
 
     def clear_received_global_plan(self):
@@ -198,7 +231,7 @@ class RosCommunicator(Node):
         msg_path.header.frame_id = "map"
         msg_path.header.stamp = self.get_clock().now().to_msg()
 
-        for x, y in path:
+        for x, y, yaw, _ in path:
             pose = PoseStamped()
             pose.header.frame_id = "map"
             pose.header.stamp = self.get_clock().now().to_msg()
@@ -206,7 +239,11 @@ class RosCommunicator(Node):
             pose.pose.position.x = x
             pose.pose.position.y = y
             pose.pose.position.z = 0.0
-            pose.pose.orientation.w = 1.0 
+            quat = Rotation.from_euler('xyz', [0.0, 0.0, yaw]).as_quat()
+            pose.pose.orientation.x = quat[0]
+            pose.pose.orientation.y = quat[1]
+            pose.pose.orientation.z = quat[2]
+            pose.pose.orientation.w = quat[3]
 
             msg_path.poses.append(pose)
 
@@ -444,3 +481,15 @@ class RosCommunicator(Node):
         config.unflipped_ids = unflipped_ids
 
         self.publisher_ArucoMarkerConfig.publish(config)
+
+    def detect_pikachu(self, image, crop: tuple):
+        crop_l, crop_r = crop
+        crop_img = image[:, crop_l:crop_r]
+        crop_msg = self.bridge.cv2_to_imgmsg(crop_img, encoding="bgr8")
+        req = PikachuDetect.Request()
+        req.image = crop_msg
+        future = self.yolo_detect_client.call(req)
+        return future.detected, future.position
+    
+    def subscriber_image_callback(self, msg):
+        self.latest_image_msg =msg

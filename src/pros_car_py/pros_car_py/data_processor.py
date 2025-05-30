@@ -1,6 +1,7 @@
 # from geometry_msgs.msg impor
 import math
 import time
+from cv_bridge import CvBridge
 
 # LiDAR global constants
 LIDAR_RANGE = 90
@@ -186,3 +187,6 @@ class DataProcessor:
             return received_global_plan_msg
         else:
             return None
+    
+    def get_latest_image(self):
+        return self.ros_communicator.bridge.compressed_imgmsg_to_cv2(self.ros_communicator.latest_image_msg, desired_encoding="bgr8")

@@ -85,6 +85,8 @@ class ModeApp:
                 on_select(options[index[0]])
             elif key == "q":
                 self.main_menu()
+            elif key == "o":
+                self.exit_program()
 
         self.loop.widget = urwid.Filler(render(), valign="top")
         self.loop.unhandled_input = key_handler

@@ -1,13 +1,14 @@
 from rclpy.node import Node
 from std_msgs.msg import String
 from pros_car_py.car_models import DeviceDataTypeEnum, CarCControl
+from pros_car_py.nav_processing import Nav2Processing
 import threading
 import time
 
 
 class CarController:
 
-    def __init__(self, ros_communicator, nav_processing):
+    def __init__(self, ros_communicator, nav_processing:Nav2Processing):
         self.ros_communicator = ros_communicator
         self.nav_processing = nav_processing
         # 用來管理後台執行緒的屬性
@@ -193,6 +194,21 @@ class CarController:
                         self.action_gen = None
                         action_key = "STOP"
 
+            elif mode == "random_door_nav":
+                if self.action_gen:
+                    try:
+                        action_key = next(self.action_gen)
+                    except StopIteration:
+                        action_key = "STOP"
+                        self.action_gen = None
+                else:
+                    self.nav_processing.reset_nav_process()
+                    self.action_gen = self.nav_processing.random_door_nav()
+                    try:
+                        action_key = next(self.action_gen)
+                    except StopIteration:
+                        self.action_gen = None
+                        action_key = "STOP"
 
             if self._thread_running == False:
                 action_key = "STOP"

@@ -91,7 +91,11 @@ class MapLoader:
         if len(img.shape) == 3:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        self.map = cv2.flip(img, 0)
+        # self.map = cv2.flip(img, 0)
+        self.map = img
+        self.map = cv2.GaussianBlur(self.map, (5, 5), 0)
+        thresh_val = int(self.occupied_thresh * 255)
+        _, self.map = cv2.threshold(self.map, thresh_val, 255, cv2.THRESH_BINARY)
         self.height, self.width = self.map.shape
 
     def position_to_pixel(self, position):
@@ -159,6 +163,7 @@ class PlannerAStar(Planner):
         return None
 
     def planning(self, start=(100,200), goal=(375,520), inter=None, img=None):
+        # img = cv2.cvtColor(self.maploader.map, cv2.COLOR_GRAY2BGR)
         if inter is None:
             inter = self.inter
         # >> map coordinate
@@ -174,24 +179,26 @@ class PlannerAStar(Planner):
 
         while self.queue:
             current_node = self.pop_from_queue()
+            if img is not None: img[current_node[1]][current_node[0]] = (0,0,1)
             if current_node is None:
                 break
 
             if self.h[current_node] < inter:
                 self.goal_node = current_node
                 break
-
+            
             for dx in range(-inter, inter+1, inter):
                 for dy in range(-inter, inter+1, inter):
                     nx = current_node[0] + dx
                     ny = current_node[1] + dy
                     neighbor = (nx,ny)
+                    
                     if  0 <= nx < self.maploader.map.shape[1] and \
                         0 <= ny <  self.maploader.map.shape[0] and \
-                        self.maploader.map[ny][nx] > 125:
-                        t_g = self.g[current_node] + inter #1
+                        self.maploader.map[ny][nx] >= 200:
+                        if img is not None: img[ny][nx] = (1,0,0)
+                        t_g = self.g[current_node] + inter 
                         if neighbor not in self.g or t_g < self.g[neighbor]:
-                            if img is not None: img[ny][nx] = (1,0,0)
                             self.g[neighbor] = t_g
                             self.h[neighbor] = distance(neighbor, goal)
                             self.parent[neighbor] = current_node
@@ -207,9 +214,12 @@ class PlannerAStar(Planner):
             p = self.parent[p]
         if path[-1] != goal:
             path.append(goal)
-
-        path = cubic_spline_2d(path, interval=5) # get list[(x,y,yaw,curv)]
-        spilt_p = lambda p: [*self.maploader.pixel_to_position(p[:2]), p[2], p[3]]
+        # cv2.imshow("Display window", img)
+        # k = cv2.waitKey(0)
+        # path = cubic_spline_2d(path, interval=inter//2) # get list[(x,y,yaw,curv)]
+        # spilt_p = lambda p: [*self.maploader.pixel_to_position(p[:2]), p[2], p[3]]
+    
+        spilt_p = lambda p: [*self.maploader.pixel_to_position(p), 0, 0]
         self.path = np.array([spilt_p(p) for p in path])
     
 class PlannerRRTStar(Planner):

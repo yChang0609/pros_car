@@ -57,7 +57,7 @@ def group_parallel_lines(edges, spatial_eps=20, angle_eps=np.radians(10), min_sa
 
     return groups
 
-def lines_can_connect(g1, g2, max_gap=30):
+def lines_can_connect(g1, g2, max_gap=100):
     g1_points = [g["start"] for g in g1] + [g["end"] for g in g1]
     g2_points = [g["start"] for g in g2] + [g["end"] for g in g2]
 
@@ -94,7 +94,7 @@ def draw_clusters(image, all_grouped_edges_dict):
     base_colors = {
         "door_edge": (255, 0, 0),
         "pillar_edge": (0, 255, 0),
-        "whell_edge": (0, 0, 255),
+        "wall_edge": (0, 0, 255),
     }
 
     for key, groups in all_grouped_edges_dict.items():
@@ -115,10 +115,10 @@ class DoorDetector:
     def __init__(self):
         self.cluster_centers = np.load("/workspaces/src/pros_car_py/kmeans_models/kmeans_centers.npy")
         self.label_map = {
-            0: "wall",
-            1: "pillar",
-            2: "door",
-            3: "floor",
+            0: "floor",
+            1: "wall",
+            2: "pillar",
+            3: "door",
             4: "other",
         }
 
@@ -151,14 +151,14 @@ class DoorDetector:
             nx = int(round(gx / norm))
             ny = int(round(gy / norm))
 
-            c1 = get_avg_color(image, x, y, nx, ny, side=30)
-            c2 = get_avg_color(image, x, y, nx, ny, side=-30)
+            # c1 = get_avg_color(image, x, y, nx, ny, side=30)
+            # c2 = get_avg_color(image, x, y, nx, ny, side=-30)
 
-            if c1 is None or c2 is None:
-                continue
+            # if c1 is None or c2 is None:
+            #     continue
 
-            label1 = self.label_map[self.classify_color(c1)]
-            label2 = self.label_map[self.classify_color(c2)]
+            label1 = self.classify_avg_color(image, x, y, nx, ny, side=30)
+            label2 = self.classify_avg_color(image, x, y, nx, ny, side=-30)
 
             for lbl in [label1, label2]:
                 if lbl in label_flags:
@@ -186,7 +186,7 @@ class DoorDetector:
         results = {
             "door_edge": {},
             "pillar_edge": {},
-            "whell_edge": {},
+            "wall_edge": {},
         }
 
         ys, xs = np.where(edges == 255)
@@ -204,16 +204,16 @@ class DoorDetector:
             if angle < 20 or angle > 100:
                 continue
 
-            c1 = get_avg_color(image, x, y, nx, ny, side=80)
-            c2 = get_avg_color(image, x, y, nx, ny, side=-80)
+            # c1 = get_avg_color(image, x, y, nx, ny, side=80)
+            # c2 = get_avg_color(image, x, y, nx, ny, side=-80)
 
-            if c1 is None or c2 is None:
-                continue
+            # if c1 is None or c2 is None:
+            #     continue
 
-            label1 = self.label_map[self.classify_color(c1)]
-            label2 = self.label_map[self.classify_color(c2)]
+            label1 = self.classify_avg_color(image, x, y, nx, ny, side=30)
+            label2 = self.classify_avg_color(image, x, y, nx, ny, side=-30)
             labels = [label1, label2]
-            edge_color_image[y, x] = (0, 0, 255)
+            # edge_color_image[y, x] = (0, 0, 255)
             edge_id = f"edge_{idx}"
             if "floor" in labels:
                 if "door" in labels:
@@ -221,7 +221,7 @@ class DoorDetector:
                     results["door_edge"][edge_id] = {"start": (x - nx, y - ny), "end": (x + nx, y + ny)}
                 elif "wall" in labels:
                     edge_color_image[y, x] = (0, 0, 255)
-                    results["whell_edge"][edge_id] = {"start": (x - nx, y - ny), "end": (x + nx, y + ny)}
+                    results["wall_edge"][edge_id] = {"start": (x - nx, y - ny), "end": (x + nx, y + ny)}
                 elif "pillar" in labels:
                     edge_color_image[y, x] = (0, 255, 0)
                     results["pillar_edge"][edge_id] = {"start": (x - nx, y - ny), "end": (x + nx, y + ny)}
@@ -237,12 +237,12 @@ class DoorDetector:
         
         results = {}
 
-        for key in ["door_edge", "pillar_edge", "whell_edge"]:
+        for key in ["door_edge", "pillar_edge", "wall_edge"]:
             if detect_target is None or key[:-5] in detect_target:
                 results[key] = edges[key]
 
         results["have_pillar_edge"] = len(edges["pillar_edge"]) > 0
-        results["have_whell"] = len(edges["whell_edge"]) > 0
+        results["have_wall"] = len(edges["wall_edge"]) > 0
         results["have_door"] = len(edges["door_edge"]) > 0
 
         return results
@@ -253,3 +253,11 @@ class DoorDetector:
         if len(xs) == 0:
             return None
         return int(sum(xs) / (2 * len(xs))), int(sum(ys) / (2 * len(ys)))
+    
+    def classify_avg_color(self, image, x, y, nx, ny, side):
+        bgr = get_avg_color(image, x, y, nx, ny, side=side)
+        if bgr is None:
+            return None
+        hsv = cv2.cvtColor(np.uint8([[bgr]]), cv2.COLOR_BGR2HSV)[0][0]
+        label = self.label_map[self.classify_color(hsv)]
+        return label

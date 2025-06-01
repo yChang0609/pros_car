@@ -480,10 +480,12 @@ class Nav2Processing:
         # === Step 5: Final forward motion to catch Pikachu ===
         yield from self.forward_and_align_until_pikachu_lost(forward_speed, align_kp, align_kd, max_turn_speed)       
     
-    def align_to(self, target, place, base_speed, Kp, max_turn, center_th=10):
-
-        error = place - target[0]
-        # Check if Pikachu is already centered
+    def align_to(self, target, center_x, base_speed=4.0, Kp=0.01, max_turn=4.0, center_th=10):
+        """
+        target: (x, y) 識別目標中心位置
+        center_x: 畫面中心的 x（例如 image.shape[1] // 2）
+        """
+        error = center_x - target[0] 
         if abs(error) < center_th:
             v_l = base_speed
             v_r = base_speed
@@ -491,16 +493,13 @@ class Nav2Processing:
             turn_adjust = Kp * error
             turn_adjust = np.clip(turn_adjust, -max_turn, max_turn)
 
-            # Reduce base speed when turning
-            # max_base_speed = base_speed
-            # min_base_speed = 2.0
-            # error_norm = min(abs(error) / place)
-            # adjusted_base = max_base_speed * (1 - error_norm) + min_base_speed * error_norm
+            error_norm = min(abs(error) / center_x, 1.0)
+            adjusted_base = base_speed * (1.0 - error_norm)
 
-        v_l =  - turn_adjust
-        v_r =  + turn_adjust
+            v_l = adjusted_base - turn_adjust
+            v_r = adjusted_base + turn_adjust
 
-        print(f"[Track] error={error}, v_l={v_l:.1f}, v_r={v_r:.1f}")
+        print(f"[Align] error={error}, v_l={v_l:.1f}, v_r={v_r:.1f}")
         yield [v_l, v_r, v_l, v_r]
 
     def random_door_nav(self):
@@ -518,6 +517,7 @@ class Nav2Processing:
         yield [0.0]*4
         
         # step 2
+        forward_speed = 5.0
         rotate_speed = 5.0
         while True:
             image = self.data_processor.get_latest_image()
@@ -542,16 +542,19 @@ class Nav2Processing:
 
         print(f"len(groups):{len(groups)}") 
         if len(groups) >= 2:
-            g1, g2 = groups["cluster_0"], groups["cluster_1"]
-            if lines_can_connect(g1, g2):
+            if lines_can_connect(groups[0]["edges"], groups[1]["edges"]):
                 print("Trun other side")
+                leave = False
                 while True:
+                    yield [rotate_speed, -rotate_speed, rotate_speed, -rotate_speed] 
                     image = self.data_processor.get_latest_image()
-                    scan_result = detector.scan(image)
-                    if len(scan_result["whell_edge"]) > 0:
+                    scan_result = detector.scan(image, ["wall"], fast_check=True)
+                    if scan_result["have_wall_edge"]:
+                        if not leave :continue
                         yield [0.0] *4
                         break
-                    yield [rotate_speed, -rotate_speed, rotate_speed, -rotate_speed] 
+                    else:
+                        leave = True
             else:
                 while True:
                     image = self.data_processor.get_latest_image()
@@ -560,14 +563,34 @@ class Nav2Processing:
                     target_group = get_further_edge_group(groups)
                     target_center = detector.get_group_center(target_group["edges"])
                     if target_group:
-                        yield from self.align_to(target_center, image.shape[0], 5.0, 0.1, 10.0, 20)
+                        yield from self.align_to(target_center, image.shape[1]//2, 5.0, 0.1, 10.0, 20)
+                    else:
+                        break
 
         else:
             while True:
-                wall_lines = groups[0]["edges"]
-                target_center = detector.get_group_center(wall_lines)
-                if target_group:
-                    yield from self.align_to(target_center, image.shape[0], 5.0, 0.1, 10.0, 20)
+                image = self.data_processor.get_latest_image()
+                scan_result = detector.scan(image)
+                well_groups = group_parallel_lines(scan_result["wall_edge"], spatial_eps=20, angle_eps=np.radians(10), min_samples=3)
+                pillar_groups = group_parallel_lines(scan_result["pillar_edge"], spatial_eps=20, angle_eps=np.radians(10), min_samples=3)
+                self.ros_communicator.edge_image_publish(detector.edge_color_image)
+                if len(well_groups) > 0:
+                    wall_lines = well_groups[0]["edges"]
+                    target_center = detector.get_group_center(wall_lines)
+                elif len(pillar_groups) > 0:
+                    target_group = get_further_edge_group(groups)
+                    door_lines = target_group["edges"]
+                    target_center = detector.get_group_center(door_lines)
+                # else:
+                    # yield [forward_speed] *4
+                    # continue
+                    
+                if target_center:
+                    print(target_center)
+                    yield from self.align_to(target_center, image.shape[1]//2, 10.0, 0.05, 10.0, 20)
+                else:
+                    break
+
  
 
 

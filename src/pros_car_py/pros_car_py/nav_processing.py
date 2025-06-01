@@ -10,6 +10,12 @@ from pros_car_py.data_processor import DataProcessor
 from pros_car_py.ros_communicator import RosCommunicator
 from pros_car_py.path_modules.path_planing import Planner, PlannerAStar, MapLoader
 from pros_car_py.path_modules.path_tracking import ControllerPurePursuit
+from pros_car_py.door_detector.detector import \
+    (DoorDetector, 
+     group_parallel_lines, 
+     lines_can_connect, 
+     get_further_edge_group,
+     draw_clusters)
 import time
 import cv2
 
@@ -473,17 +479,102 @@ class Nav2Processing:
         
         # === Step 5: Final forward motion to catch Pikachu ===
         yield from self.forward_and_align_until_pikachu_lost(forward_speed, align_kp, align_kd, max_turn_speed)       
+    
+    def align_to(self, target, place, base_speed, Kp, max_turn, center_th=10):
+
+        error = place - target[0]
+        # Check if Pikachu is already centered
+        if abs(error) < center_th:
+            v_l = base_speed
+            v_r = base_speed
+        else:
+            turn_adjust = Kp * error
+            turn_adjust = np.clip(turn_adjust, -max_turn, max_turn)
+
+            # Reduce base speed when turning
+            # max_base_speed = base_speed
+            # min_base_speed = 2.0
+            # error_norm = min(abs(error) / place)
+            # adjusted_base = max_base_speed * (1 - error_norm) + min_base_speed * error_norm
+
+        v_l =  - turn_adjust
+        v_r =  + turn_adjust
+
+        print(f"[Track] error={error}, v_l={v_l:.1f}, v_r={v_r:.1f}")
+        yield [v_l, v_r, v_l, v_r]
 
     def random_door_nav(self):
-        map_path = "/workspaces/src/pros_car_py/config/random_door"
+        detector = DoorDetector()
+        print(f"\n")
+        # step 1
+        backward_speed = -5.0
+        image = self.data_processor.get_latest_image()
+        scan_result = detector.scan(image)
+        while not scan_result["have_pillar_edge"]:
+            yield [backward_speed]*4
+            image = self.data_processor.get_latest_image()
+            scan_result = detector.scan(image)
+            self.ros_communicator.edge_image_publish(detector.edge_color_image)
+        yield [0.0]*4
+        
+        # step 2
+        rotate_speed = 5.0
+        while True:
+            image = self.data_processor.get_latest_image()
+            scan_result = detector.scan(image, ["wall"], fast_check=True)
 
-        # === Initialization ===
-        path_planner = PlannerAStar(MapLoader(map_path), inter=5)
-        controller = ControllerPurePursuit()
-        self.ros_communicator.publish_aruco_marker_config(
-            path_planner.maploader.unflipped_ids,
-            path_planner.maploader.aruco_config)
-        self.publish_map_data(path_planner)
+            if scan_result["have_wall_edge"]:
+                yield [0.0] *4
+                break
+            yield [-rotate_speed, rotate_speed, -rotate_speed, rotate_speed]
+
+        image = self.data_processor.get_latest_image()
+        scan_result = detector.scan(image)
+        groups = group_parallel_lines(scan_result["door_edge"], spatial_eps=20, angle_eps=np.radians(10), min_samples=3)
+        grouped = {
+            "door_edge": groups,
+            # "pillar_edge": group_parallel_lines(scan_result["pillar_edge"], spatial_eps=20, angle_eps=np.radians(10), min_samples=3),
+            # "whell_edge": group_parallel_lines(scan_result["whell_edge"], spatial_eps=20, angle_eps=np.radians(10), min_samples=3),
+        }
+        # self.ros_communicator.edge_image_publish(draw_clusters(image, grouped))
+        self.ros_communicator.edge_image_publish(detector.edge_color_image)
+
+
+        print(f"len(groups):{len(groups)}") 
+        if len(groups) >= 2:
+            g1, g2 = groups["cluster_0"], groups["cluster_1"]
+            if lines_can_connect(g1, g2):
+                print("Trun other side")
+                while True:
+                    image = self.data_processor.get_latest_image()
+                    scan_result = detector.scan(image)
+                    if len(scan_result["whell_edge"]) > 0:
+                        yield [0.0] *4
+                        break
+                    yield [rotate_speed, -rotate_speed, rotate_speed, -rotate_speed] 
+            else:
+                while True:
+                    image = self.data_processor.get_latest_image()
+                    scan_result = detector.scan(image)
+                    groups = group_parallel_lines(scan_result["door_edge"])
+                    target_group = get_further_edge_group(groups)
+                    target_center = detector.get_group_center(target_group["edges"])
+                    if target_group:
+                        yield from self.align_to(target_center, image.shape[0], 5.0, 0.1, 10.0, 20)
+
+        else:
+            while True:
+                wall_lines = groups[0]["edges"]
+                target_center = detector.get_group_center(wall_lines)
+                if target_group:
+                    yield from self.align_to(target_center, image.shape[0], 5.0, 0.1, 10.0, 20)
+ 
+
+
+                
+        #有沒有柱子接著牆壁(把pillar line exten可不可以直接碰到牆壁給kmeans判斷)
+        #可以的話把牆的線平行x軸開始直走
+
         while True:
             yield "STOP"
 

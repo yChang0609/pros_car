@@ -196,8 +196,13 @@ class RosCommunicator(Node):
             self, NavigateToPose, "/navigate_to_pose"
         )
 
+        self.edge_image_publisher = self.create_publisher(
+            CompressedImage,
+            '/pros_car/edge_image', 10)
+        
         # >> YOLO service
         self.yolo_detect_client = self.create_client(PikachuDetect, 'detect_pikachu')
+
 
 
     def clear_received_global_plan(self):
@@ -493,3 +498,7 @@ class RosCommunicator(Node):
     
     def subscriber_image_callback(self, msg):
         self.latest_image_msg =msg
+
+    def edge_image_publish(self, image):
+        msg = self.bridge.cv2_to_compressed_imgmsg(image)
+        self.edge_image_publisher.publish(msg)

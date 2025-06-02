@@ -5,6 +5,24 @@ import random
 import math
 from sklearn.cluster import DBSCAN
 
+def cal_door_len(door_groups):
+    total_len = 0
+    for group in door_groups:
+        for edge in group["edges"]:
+            x0, y0 = edge["start"]
+            x1, y1 = edge["end"]
+            length = np.hypot(x1 - x0, y1 - y0)
+            total_len += length
+    return total_len
+
+def is_between_groups(door_center, pillar1_center, pillar2_center, margin=50):
+    """
+    檢查一條門 edge 是否在兩個柱子 edge group 中間。
+    """
+    x1 = min(pillar1_center[0], pillar2_center[0])
+    x2 = max(pillar1_center[0], pillar2_center[0])
+    return x1 + margin < door_center[0] < x2 - margin
+
 def angle_between(p1, p2):
     dx, dy = p2[0] - p1[0], p2[1] - p1[1]
     return np.arctan2(dy, dx) 
@@ -56,8 +74,21 @@ def group_parallel_lines(edges, spatial_eps=20, angle_eps=np.radians(10), min_sa
         groups.append(group)
 
     return groups
+def lines_can_connect(groups, max_gap=100):
+    unconnectable = None
+    for i in range(len(groups)):
+        connectable = False
+        for j in range(len(groups)):
+            if i == j:
+                continue
+            if lines_connect_test(groups[i]["edges"], groups[j]["edges"], max_gap):
+                connectable = True
+                break
+        if not connectable:
+            unconnectable = groups[i]
+    return unconnectable, not unconnectable
 
-def lines_can_connect(g1, g2, max_gap=100):
+def lines_connect_test(g1, g2, max_gap=80):
     g1_points = [g["start"] for g in g1] + [g["end"] for g in g1]
     g2_points = [g["start"] for g in g2] + [g["end"] for g in g2]
 
@@ -71,7 +102,10 @@ def lines_can_connect(g1, g2, max_gap=100):
 def get_further_edge_group(groups):
     def avg_y(group):
         return np.mean([pt[1] for g in group["edges"] for pt in [g["start"], g["end"]]])
-    return min(groups, key=avg_y)
+    if len(groups) > 0:
+        return min(groups, key=avg_y)
+    else:
+        return None
 
 def get_avg_color(img, x, y, dx, dy, side=1, size=3):
     h, w, _ = img.shape
@@ -125,7 +159,29 @@ class DoorDetector:
     def classify_color(self, color):
         distances = np.linalg.norm(self.cluster_centers - color, axis=1)
         return int(np.argmin(distances))
-        
+    
+    def classify_whole_image_by_ratio(self, image, threshold=0.8):
+        """
+        使用 kmeans cluster_centers 快速分類整張影像，判斷是否超過 threshold 屬於某一類
+        """
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        h, w, _ = hsv.shape
+        reshaped = hsv.reshape(-1, 3)
+
+        distances = np.linalg.norm(self.cluster_centers - reshaped[:, None], axis=2)
+        pred_indices = np.argmin(distances, axis=1)
+
+        unique, counts = np.unique(pred_indices, return_counts=True)
+        total = h * w
+
+        label_ratios = {self.label_map[int(k)]: v / total for k, v in zip(unique, counts)}
+
+        for label, ratio in label_ratios.items():
+            if ratio >= threshold:
+                return True, label, ratio  # 是、類別名稱、占比
+
+        return False, None, label_ratios
+    
     def fast_object_check(self, image, detect_target):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         edges = cv2.Canny(gray, 50, 150)
@@ -162,7 +218,6 @@ class DoorDetector:
 
             for lbl in [label1, label2]:
                 if lbl in label_flags:
-                    print(lbl)
                     label_flags[lbl] = True
 
 

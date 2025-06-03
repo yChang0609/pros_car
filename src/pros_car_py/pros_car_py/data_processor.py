@@ -2,6 +2,7 @@
 import math
 import time
 from cv_bridge import CvBridge
+import cv2
 
 # LiDAR global constants
 LIDAR_RANGE = 90
@@ -189,4 +190,7 @@ class DataProcessor:
             return None
     
     def get_latest_image(self):
+        # image = self.ros_communicator.bridge.compressed_imgmsg_to_cv2(self.ros_communicator.latest_image_msg, desired_encoding="bgr8")
+        # return cv2.fastNlMeansDenoisingColored(image, None, h=10, hColor=10, templateWindowSize=7, searchWindowSize=21)
         return self.ros_communicator.bridge.compressed_imgmsg_to_cv2(self.ros_communicator.latest_image_msg, desired_encoding="bgr8")
+

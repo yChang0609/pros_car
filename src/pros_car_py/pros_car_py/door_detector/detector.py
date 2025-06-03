@@ -4,6 +4,8 @@ import numpy as np
 import random
 import math
 from sklearn.cluster import DBSCAN
+from concurrent.futures import ThreadPoolExecutor
+import time
 
 def cal_door_len(door_groups):
     total_len = 0
@@ -55,7 +57,7 @@ def group_parallel_lines(edges, spatial_eps=20, angle_eps=np.radians(10), min_sa
     X[:, 0:2] *= spatial_scale
     X[:, 2:4] *= angle_scale
 
-    clustering = DBSCAN(eps=1.0, min_samples=min_samples).fit(X)
+    clustering = DBSCAN(eps=3.0, min_samples=min_samples).fit(X)
     labels = clustering.labels_
     
     groups = []
@@ -75,7 +77,7 @@ def group_parallel_lines(edges, spatial_eps=20, angle_eps=np.radians(10), min_sa
 
     return groups
 def lines_can_connect(groups, max_gap=100):
-    unconnectable = None
+    unconnectable_groups = []
     for i in range(len(groups)):
         connectable = False
         for j in range(len(groups)):
@@ -85,8 +87,8 @@ def lines_can_connect(groups, max_gap=100):
                 connectable = True
                 break
         if not connectable:
-            unconnectable = groups[i]
-    return unconnectable, not unconnectable
+            unconnectable_groups.append(groups[i])
+    return unconnectable_groups, len(unconnectable_groups) == 0
 
 def lines_connect_test(g1, g2, max_gap=80):
     g1_points = [g["start"] for g in g1] + [g["end"] for g in g1]
@@ -96,7 +98,7 @@ def lines_connect_test(g1, g2, max_gap=80):
         np.linalg.norm(np.array(p1) - np.array(p2))
         for p1 in g1_points for p2 in g2_points
     )
-
+    print(f"{min_dist} < {max_gap}:{min_dist < max_gap}")
     return min_dist < max_gap
 
 def get_further_edge_group(groups):
@@ -122,6 +124,17 @@ def get_avg_color(img, x, y, dx, dy, side=1, size=3):
         return np.mean(values, axis=0)
     return None
 
+def get_avg_color_fast(image, x, y, nx, ny, side=30, patch_size=5):
+    px = int(round(x + nx * side))
+    py = int(round(y + ny * side))
+    h, w = image.shape[:2]
+    half = patch_size // 2
+
+    if px - half < 0 or px + half >= w or py - half < 0 or py + half >= h:
+        return None
+
+    patch = image[py - half:py + half + 1, px - half:px + half + 1]
+    return patch.mean(axis=(0, 1))
 
 def draw_clusters(image, all_grouped_edges_dict):
     vis = image.copy()
@@ -145,6 +158,20 @@ def draw_clusters(image, all_grouped_edges_dict):
 
     return vis
 
+def process_patch_with_coords(image, x0, y0, x1, y1):
+    patch = image[y0:y1, x0:x1]
+    gray = cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 50, 150)
+    dx = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
+    dy = cv2.Sobel(gray, cv2.CV_64F, 0, 1)
+
+    return {
+        "region": (x0, y0, x1, y1),
+        "edges": edges,
+        "dx": dx,
+        "dy": dy
+    }
+
 class DoorDetector:
     def __init__(self):
         self.cluster_centers = np.load("/workspaces/src/pros_car_py/kmeans_models/kmeans_centers.npy")
@@ -155,135 +182,10 @@ class DoorDetector:
             3: "door",
             4: "other",
         }
-
-    def classify_color(self, color):
-        distances = np.linalg.norm(self.cluster_centers - color, axis=1)
-        return int(np.argmin(distances))
-    
-    def classify_whole_image_by_ratio(self, image, threshold=0.8):
-        """
-        使用 kmeans cluster_centers 快速分類整張影像，判斷是否超過 threshold 屬於某一類
-        """
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        h, w, _ = hsv.shape
-        reshaped = hsv.reshape(-1, 3)
-
-        distances = np.linalg.norm(self.cluster_centers - reshaped[:, None], axis=2)
-        pred_indices = np.argmin(distances, axis=1)
-
-        unique, counts = np.unique(pred_indices, return_counts=True)
-        total = h * w
-
-        label_ratios = {self.label_map[int(k)]: v / total for k, v in zip(unique, counts)}
-
-        for label, ratio in label_ratios.items():
-            if ratio >= threshold:
-                return True, label, ratio  # 是、類別名稱、占比
-
-        return False, None, label_ratios
-    
-    def fast_object_check(self, image, detect_target):
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        edges = cv2.Canny(gray, 50, 150)
-        dx = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
-        dy = cv2.Sobel(gray, cv2.CV_64F, 0, 1)
-
-        if detect_target is None:
-            detect_target = ["floor", "door", "pillar", "wall"]
-
-        label_flags = {label: False for label in detect_target}
-
-        ys, xs = np.where(edges == 255)
-        mask = ys > 250 
-        ys = ys[mask]
-        xs = xs[mask]
-        for x, y in zip(xs, ys):
-            gx = dx[y, x]
-            gy = dy[y, x]
-            norm = np.sqrt(gx ** 2 + gy ** 2)
-            if norm == 0:
-                continue
-
-            nx = int(round(gx / norm))
-            ny = int(round(gy / norm))
-
-            # c1 = get_avg_color(image, x, y, nx, ny, side=30)
-            # c2 = get_avg_color(image, x, y, nx, ny, side=-30)
-
-            # if c1 is None or c2 is None:
-            #     continue
-
-            label1 = self.classify_avg_color(image, x, y, nx, ny, side=30)
-            label2 = self.classify_avg_color(image, x, y, nx, ny, side=-30)
-
-            for lbl in [label1, label2]:
-                if lbl in label_flags:
-                    label_flags[lbl] = True
-
-
-            if all(label_flags[k] for k in detect_target):
-                break
-
-        result = {}
-        for k in ["door", "wall", "pillar"]:
-            if detect_target is None or k in detect_target:
-                result[f"have_{k}_edge"] = label_flags[k]
-
-        return result
-
-    def process_image(self, image):
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        edges = cv2.Canny(gray, 50, 150)
-        dx = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
-        dy = cv2.Sobel(gray, cv2.CV_64F, 0, 1)
-        edge_color_image = image.copy()
-
-        results = {
-            "door_edge": {},
-            "pillar_edge": {},
-            "wall_edge": {},
-        }
-
-        ys, xs = np.where(edges == 255)
-        for idx, (x, y) in enumerate(zip(xs, ys)):
-            gx = dx[y, x]
-            gy = dy[y, x]
-            norm = np.sqrt(gx**2 + gy**2)
-            if norm == 0:
-                continue
-
-            nx = int(round(gx / norm))
-            ny = int(round(gy / norm))
-
-            angle = np.abs(np.arctan2(gy, gx) * 180.0 / np.pi)
-            if angle < 20 or angle > 100:
-                continue
-
-            # c1 = get_avg_color(image, x, y, nx, ny, side=80)
-            # c2 = get_avg_color(image, x, y, nx, ny, side=-80)
-
-            # if c1 is None or c2 is None:
-            #     continue
-
-            label1 = self.classify_avg_color(image, x, y, nx, ny, side=30)
-            label2 = self.classify_avg_color(image, x, y, nx, ny, side=-30)
-            labels = [label1, label2]
-            # edge_color_image[y, x] = (0, 0, 255)
-            edge_id = f"edge_{idx}"
-            if "floor" in labels:
-                if "door" in labels:
-                    edge_color_image[y, x] = (255, 0, 0)
-                    results["door_edge"][edge_id] = {"start": (x - nx, y - ny), "end": (x + nx, y + ny)}
-                elif "wall" in labels:
-                    edge_color_image[y, x] = (0, 0, 255)
-                    results["wall_edge"][edge_id] = {"start": (x - nx, y - ny), "end": (x + nx, y + ny)}
-                elif "pillar" in labels:
-                    edge_color_image[y, x] = (0, 255, 0)
-                    results["pillar_edge"][edge_id] = {"start": (x - nx, y - ny), "end": (x + nx, y + ny)}
-                # else:
-                    # edge_color_image[y, x] = (255, 0, 255)
-        return results, edge_color_image
-    
+        self.executor = ThreadPoolExecutor(max_workers=8) 
+    def __del__(self):
+        self.executor.shutdown()
+        
     def scan(self, image, detect_target=None, fast_check=False):
         if fast_check:  
             return self.fast_object_check(image, detect_target)
@@ -297,10 +199,203 @@ class DoorDetector:
                 results[key] = edges[key]
 
         results["have_pillar_edge"] = len(edges["pillar_edge"]) > 0
-        results["have_wall"] = len(edges["wall_edge"]) > 0
-        results["have_door"] = len(edges["door_edge"]) > 0
+        results["have_wall_edge"] = len(edges["wall_edge"]) > 0
+        results["have_door_edge"] = len(edges["door_edge"]) > 0
+        results["have_floor_edge"] = len(edges["pillar_edge"]) > 0 or len(edges["wall_edge"]) > 0 or len(edges["door_edge"]) > 0
 
         return results
+    
+    def classify_color(self, color):
+        diffs = self.cluster_centers - color  # shape: (K, 3)
+        dists = np.sum(diffs ** 2, axis=1)    # faster than np.linalg.norm
+        return int(np.argmin(dists))
+    
+    def classify_avg_color(self, image, x, y, nx, ny, side):
+        bgr = get_avg_color_fast(image, x, y, nx, ny, side=side)
+        if bgr is None:
+            return None
+        hsv = cv2.cvtColor(np.uint8([[bgr]]), cv2.COLOR_BGR2HSV)[0][0]
+        label = self.label_map[self.classify_color(hsv)]
+        return label
+    
+    def classify_avg_hsv(self, hsv, x, y, nx, ny, side):
+        hsv = get_avg_color_fast(hsv, x, y, nx, ny, side=side)
+        if hsv is None:
+            return None
+        
+        #hsv = cv2.cvtColor(np.uint8([[bgr]]), cv2.COLOR_BGR2HSV)[0][0]
+        label = self.label_map[self.classify_color(hsv)]
+        return label
+
+    def classify_whole_image_by_ratio(self, image, threshold=0.8):
+
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        h, w, _ = hsv.shape
+        reshaped = hsv.reshape(-1, 3)
+
+        distances = np.linalg.norm(self.cluster_centers - reshaped[:, None], axis=2)
+        pred_indices = np.argmin(distances, axis=1)
+
+        unique, counts = np.unique(pred_indices, return_counts=True)
+        total = h * w
+
+        label_ratios = {self.label_map[int(k)]: v / total for k, v in zip(unique, counts)}
+
+        for label, ratio in label_ratios.items():
+            # print(f"{label}:{ratio}")
+            if ratio >= threshold:
+                return True, label, ratio 
+        return False, None, label_ratios
+    
+    def slice_and_process_parallel(self, image, patch_size=200, y_start=100, max_workers=4):
+        h, w = image.shape[:2]
+        tasks = []
+        for y0 in range(y_start, h, patch_size//2):
+            y1 = min(y0 + patch_size, h)
+            for x0 in range(0, w, patch_size//2):
+                x1 = min(x0 + patch_size, w)
+                tasks.append((x0, y0, x1, y1))
+
+        return list(self.executor.map(lambda args: process_patch_with_coords(image, *args), tasks))
+    
+    def fast_object_check(self, image, detect_target, threshold=0.01):
+        if detect_target is None:
+            detect_target = ["floor", "door", "pillar", "wall"]
+
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        h, w, _ = hsv.shape
+
+        masked_hsv = hsv[100:, :, :] 
+        reshaped = masked_hsv.reshape(-1, 3)
+
+        dists = np.linalg.norm(self.cluster_centers - reshaped[:, None], axis=2)
+        pred_indices = np.argmin(dists, axis=1)
+
+        unique, counts = np.unique(pred_indices, return_counts=True)
+        total_pixels = reshaped.shape[0]
+        label_ratios = {self.label_map[int(k)]: v / total_pixels for k, v in zip(unique, counts)}
+
+        result = {}
+        for label in detect_target:
+            ratio = label_ratios.get(label, 0.0)
+            result[f"have_{label}_edge"] = ratio >= threshold
+
+        return result
+
+    def process_image(self, image):
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        edge_color_image = image.copy()
+        patches = self.slice_and_process_parallel(image, y_start=60)
+
+        results = {
+            "door_edge": {},
+            "pillar_edge": {},
+            "wall_edge": {},
+        }
+        all_points = []
+        for patch in patches:
+            x0, y0, _, _ = patch["region"]
+            edges = patch["edges"]
+            dx = patch["dx"]
+            dy = patch["dy"]
+
+            ys, xs = np.where(edges == 255)
+            xs = xs[::4]
+            ys = ys[::4]
+            for x, y in zip(xs, ys):
+                gx = dx[y, x]
+                gy = dy[y, x]
+
+                angle = np.abs(np.arctan2(gy, gx) * 180.0 / np.pi)
+                if angle < 20 or angle > 100:
+                    continue
+
+                norm = np.sqrt(gx ** 2 + gy ** 2)
+                if norm == 0:
+                    continue
+
+                nx = int(round(gx / norm))
+                ny = int(round(gy / norm))
+
+                global_x = x0 + x
+                global_y = y0 + y
+                all_points.append((global_x, global_y, nx, ny))
+        def process_point(idx, x, y, nx, ny):
+            label1 = self.classify_avg_hsv(hsv_image, x, y, nx, ny, side=30)
+            label2 = self.classify_avg_hsv(hsv_image, x, y, nx, ny, side=-30)
+            labels = [label1, label2]
+
+            if "floor" in labels:
+                edge_id = f"edge_{idx}"
+                edge_color_image[y, x] = (255, 0, 255)
+                if "door" in labels:
+                    edge_color_image[y, x] = (255, 0, 0)
+                    return ("door_edge", edge_id, x, y, nx, ny)
+                elif "wall" in labels:
+                    edge_color_image[y, x] = (0, 0, 255)
+                    return ("wall_edge", edge_id, x, y, nx, ny)
+                elif "pillar" in labels:
+                    edge_color_image[y, x] = (0, 255, 0)
+                    return ("pillar_edge", edge_id, x, y, nx, ny)
+            return None
+        futures = [
+            self.executor.submit(process_point, idx, x, y, nx, ny)
+            for idx, (x, y, nx, ny) in enumerate(all_points)
+        ]
+        for future in futures:
+            result = future.result()
+            if result:
+                key, edge_id, x, y, nx, ny = result
+                results[key][edge_id] = {"start": (x - nx, y - ny), "end": (x + nx, y + ny)}
+        return results, edge_color_image
+    
+    def detect_pillar_wall_pair(self, image):
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        edges = cv2.Canny(gray, 50, 150)
+        dx = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
+        dy = cv2.Sobel(gray, cv2.CV_64F, 0, 1)
+
+        edge_color_image = image.copy()
+        ys, xs = np.where(edges == 255)
+
+        all_points = [(x, y) for x, y in zip(xs, ys) if y > 100]
+        def process_point(x, y):
+            gx = dx[y, x]
+            gy = dy[y, x]
+            norm = np.hypot(gx, gy)
+            if norm == 0:
+                return None
+
+            angle = np.degrees(np.abs(np.arctan2(gy, gx)))
+            if not (angle < 20 or angle > 100):
+                return None
+
+            nx = int(round(gx / norm))
+            ny = int(round(gy / norm))
+
+            label1 = self.classify_avg_hsv(hsv, x, y, nx, ny, side=30)
+            label2 = self.classify_avg_hsv(hsv, x, y, nx, ny, side=-30)
+
+            
+
+            if {label1, label2} == {"pillar", "wall"}:
+                return (True, (x, y))
+            return None
+
+        futures = [
+            self.executor.submit(process_point, x, y)
+            for x, y in all_points
+        ]
+
+        for future in futures:
+            res = future.result()
+            if res:
+                edge_color_image[res[1][1], res[1][0]] = (0, 0, 255)
+                return True, res[1]
+
+        self.edge_color_image = edge_color_image
+        return False, None
     
     def get_group_center(self, edges):
         xs = [e["start"][0] + e["end"][0] for e in edges]
@@ -309,10 +404,32 @@ class DoorDetector:
             return None
         return int(sum(xs) / (2 * len(xs))), int(sum(ys) / (2 * len(ys)))
     
-    def classify_avg_color(self, image, x, y, nx, ny, side):
-        bgr = get_avg_color(image, x, y, nx, ny, side=side)
-        if bgr is None:
-            return None
-        hsv = cv2.cvtColor(np.uint8([[bgr]]), cv2.COLOR_BGR2HSV)[0][0]
-        label = self.label_map[self.classify_color(hsv)]
-        return label
+    def segment_image(self, image, visual=True):
+        """
+        使用 KMeans 分類每個 pixel，產生 segmentation 圖。
+        如果 visual=True，則回傳彩色圖；否則回傳 label map。
+        """
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        h, w, _ = hsv.shape
+        reshaped = hsv.reshape(-1, 3)
+
+        dists = np.linalg.norm(self.cluster_centers - reshaped[:, None], axis=2)
+        pred_indices = np.argmin(dists, axis=1)
+        pred_labels = pred_indices.reshape(h, w)
+
+        if not visual:
+            return pred_labels  
+
+        color_map = {
+            "floor": (255, 0, 255),
+            "wall": (255, 0, 0),
+            "pillar": (0, 255, 0),
+            "door": (0, 0, 255),
+            "other": (100, 100, 100),
+        }
+
+        seg_img = np.zeros((h, w, 3), dtype=np.uint8)
+        for label_idx, name in self.label_map.items():
+            seg_img[pred_labels == label_idx] = color_map.get(name, (0, 0, 0))
+
+        return seg_img

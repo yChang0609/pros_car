@@ -7,6 +7,14 @@ from sklearn.cluster import DBSCAN
 from concurrent.futures import ThreadPoolExecutor
 import time
 
+def hsv_to_circular_cartesian(hsv):
+    h, s, v = hsv[:, 0], hsv[:, 1] / 255.0, hsv[:, 2] / 255.0
+    h_rad = h / 180.0 * np.pi
+    x = np.cos(h_rad) * s
+    y = np.sin(h_rad) * s
+    z = v
+    return np.stack([x, y, z], axis=1)
+
 def cal_door_len(door_groups):
     total_len = 0
     for group in door_groups:
@@ -172,13 +180,37 @@ def process_patch_with_coords(image, x0, y0, x1, y1):
         "dy": dy
     }
 
+def get_weighted_avg_hsv_patch(hsv_image, x, y, nx, ny, side=30, patch_size=5):
+    px = int(round(x + nx * side))
+    py = int(round(y + ny * side))
+    h, w = hsv_image.shape[:2]
+    half = patch_size // 2
+
+    if px - half < 0 or px + half >= w or py - half < 0 or py + half >= h:
+        return None
+
+    patch = hsv_image[py - half:py + half + 1, px - half:px + half + 1]
+
+    ys, xs = np.mgrid[-half:half+1, -half:half+1]
+    dist_squared = xs**2 + ys**2
+    sigma = patch_size / 2.0
+    weights = np.exp(-dist_squared / (2 * sigma**2))
+    weights = weights / np.sum(weights) 
+
+    weighted_h = np.sum(patch[:, :, 0] * weights)
+    weighted_s = np.sum(patch[:, :, 1] * weights)
+    weighted_v = np.sum(patch[:, :, 2] * weights)
+
+    return np.array([weighted_h, weighted_s, weighted_v])
+
 class DoorDetector:
     def __init__(self):
         self.cluster_centers = np.load("/workspaces/src/pros_car_py/kmeans_models/kmeans_centers.npy")
+        # print(self.cluster_centers)
         self.label_map = {
-            0: "floor",
+            0: "pillar",
             1: "wall",
-            2: "pillar",
+            2: "floor",
             3: "door",
             4: "other",
         }
@@ -359,6 +391,9 @@ class DoorDetector:
         edge_color_image = image.copy()
         ys, xs = np.where(edges == 255)
 
+        pillar_lower = np.array([0, 0, 200])
+        pillar_upper = np.array([180, 15, 255])
+
         all_points = [(x, y) for x, y in zip(xs, ys) if y > 100]
         def process_point(x, y):
             gx = dx[y, x]
@@ -368,17 +403,25 @@ class DoorDetector:
                 return None
 
             angle = np.degrees(np.abs(np.arctan2(gy, gx)))
-            if not (angle < 20 or angle > 100):
+            if not(angle < 30 or angle > 150):
                 return None
 
             nx = int(round(gx / norm))
             ny = int(round(gy / norm))
 
-            label1 = self.classify_avg_hsv(hsv, x, y, nx, ny, side=30)
-            label2 = self.classify_avg_hsv(hsv, x, y, nx, ny, side=-30)
 
+            hsv1 = get_weighted_avg_hsv_patch(hsv, x, y, nx, ny, side=30)
+            hsv2 = get_weighted_avg_hsv_patch(hsv, x, y, nx, ny, side=-30)
+
+            if hsv1 is None or hsv2 is None:
+                return None
             
+            is_pillar1 = np.all(pillar_lower <= hsv1) and np.all(hsv1 <= pillar_upper)
+            is_pillar2 = np.all(pillar_lower <= hsv2) and np.all(hsv2 <= pillar_upper)
 
+            label1 = self.label_map[self.classify_color(hsv1)] if not is_pillar1 else "pillar"
+            label2 = self.label_map[self.classify_color(hsv2)] if not is_pillar2 else "pillar"
+            cv2.circle(edge_color_image, (x,y), 3, (255,0,0), 1)
             if {label1, label2} == {"pillar", "wall"}:
                 return (True, (x, y))
             return None
@@ -387,14 +430,13 @@ class DoorDetector:
             self.executor.submit(process_point, x, y)
             for x, y in all_points
         ]
-
+        count = 0
         for future in futures:
             res = future.result()
             if res:
-                edge_color_image[res[1][1], res[1][0]] = (0, 0, 255)
+                self.edge_color_image = edge_color_image
                 return True, res[1]
 
-        self.edge_color_image = edge_color_image
         return False, None
     
     def get_group_center(self, edges):
@@ -405,10 +447,48 @@ class DoorDetector:
         return int(sum(xs) / (2 * len(xs))), int(sum(ys) / (2 * len(ys)))
     
     def segment_image(self, image, visual=True):
-        """
-        使用 KMeans 分類每個 pixel，產生 segmentation 圖。
-        如果 visual=True，則回傳彩色圖；否則回傳 label map。
-        """
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        h_img, w_img, _ = hsv.shape
+        reshaped_hsv = hsv.reshape(-1, 3)
+
+        # 1. Convert HSV to circular Cartesian coordinates
+        cartesian_pixels = hsv_to_circular_cartesian(reshaped_hsv)
+
+        # 2. Compute distances to cluster centers (already in cartesian space)
+        dists = np.linalg.norm(cartesian_pixels[:, None] - self.cluster_centers, axis=2)
+        min_dists = np.min(dists, axis=1)
+        pred_indices = np.argmin(dists, axis=1)
+
+        # # 3. Optional: mask out bad matches (too far from any cluster center)
+        threshold = 1.0  
+        pred_indices[min_dists > threshold] = -1
+        pred_labels = pred_indices.reshape(h_img, w_img)
+
+        if not visual:
+            return pred_labels  
+        
+        # 4. Create segmentation visualization
+        color_map = {
+            "floor": (255, 0, 255),
+            "wall": (255, 0, 0),
+            "pillar": (0, 255, 0),
+            "door": (0, 0, 255),
+            "other": (100, 100, 100),
+            # "unknown": (30, 30, 30),
+        }
+
+        seg_img = np.zeros((h_img, w_img, 3), dtype=np.uint8)
+        for label_idx, name in self.label_map.items():
+            seg_img[pred_labels == label_idx] = color_map.get(name, (0, 0, 0))
+
+        # # 5. Optional: override with HSV fixed threshold for pillars (boost recall)
+        # pillar_lower = np.array([0, 0, 200])
+        # pillar_upper = np.array([180, 15, 255])
+        # pillar_mask = cv2.inRange(hsv, pillar_lower, pillar_upper)
+        # seg_img[pillar_mask > 0] = color_map["pillar"]
+
+        return seg_img
+    def get_class_bounding_boxes(self, image, target_class="wall", min_area=100):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         h, w, _ = hsv.shape
         reshaped = hsv.reshape(-1, 3)
@@ -417,19 +497,28 @@ class DoorDetector:
         pred_indices = np.argmin(dists, axis=1)
         pred_labels = pred_indices.reshape(h, w)
 
-        if not visual:
-            return pred_labels  
+        target_label_idx = None
+        for idx, name in self.label_map.items():
+            if name == target_class:
+                target_label_idx = idx
+                break
 
-        color_map = {
-            "floor": (255, 0, 255),
-            "wall": (255, 0, 0),
-            "pillar": (0, 255, 0),
-            "door": (0, 0, 255),
-            "other": (100, 100, 100),
-        }
+        if target_label_idx is None:
+            print(f"[Error] Class '{target_class}' not found.")
+            return []
 
-        seg_img = np.zeros((h, w, 3), dtype=np.uint8)
-        for label_idx, name in self.label_map.items():
-            seg_img[pred_labels == label_idx] = color_map.get(name, (0, 0, 0))
+        # Create binary mask for the class
+        mask = (pred_labels == target_label_idx).astype(np.uint8)
+        mask[:100, :] = 0 
+        binary_mask = mask * 255
 
-        return seg_img
+        # Find contours (connected components)
+        contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        bounding_boxes = []
+        for cnt in contours:
+            x, y, bw, bh = cv2.boundingRect(cnt)
+            if bw * bh >= min_area:
+                bounding_boxes.append((x, y, bw, bh))
+
+        return bounding_boxes

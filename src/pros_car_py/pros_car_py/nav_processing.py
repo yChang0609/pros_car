@@ -539,7 +539,8 @@ class Nav2Processing:
         max_turn=4.0, 
         center_th=10,
         weight_center=0.2,
-        weight_angle=0.8
+        weight_angle=0.8,
+        extra_turn_error=0.0  # <-- add this
     ):
         error_center = center_x - target[0]
 
@@ -557,8 +558,8 @@ class Nav2Processing:
   
         turn_center = Kp_center * error_center
         turn_angle = Kp_angle * angle_error * 180 / np.pi
-
-        turn_adjust = weight_center * turn_center + weight_angle * turn_angle
+        # turn_adjust = weight_center * turn_center + weight_angle * turn_angle
+        turn_adjust = weight_center * turn_center + weight_angle * turn_angle + extra_turn_error
         turn_adjust = np.clip(turn_adjust, -max_turn, max_turn)
 
         error_norm = min(abs(error_center) / center_x, 1.0)
@@ -576,18 +577,24 @@ class Nav2Processing:
         show_state = True
         # while True:
         #     image = self.data_processor.get_latest_image()
-        #     image = cv2.fastNlMeansDenoisingColored(image, None, h=10, hColor=10, templateWindowSize=7, searchWindowSize=21)
-        #     scan_result = detector.scan(image)
-        #     self.ros_communicator.edge_image_publish(detector.edge_color_image)       
+        #     # wall_bounding_boxes = detector.get_class_bounding_boxes(image, target_class="wall")
+        #     # x, y, w, h = wall_bounding_boxes[0] 
+        #     # print(f"h:{h}")
+        #     # print(f"w:{w}")
+        #     # if w*h > 500: color = (0, 255, 255)
+        #     # else:color = (0, 0, 255)
+        #     # cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
+        #     # scan_result = detector.scan(image)
+        #     self.ros_communicator.edge_image_publish(detector.segment_image(image))       
         #     yield [0.0]*4
 
         # Step 1: Move backward until pillar edges are visible
         if show_state:print("[Step 1] Reversing until floor edge appears...")
         backward_speed = -15.0
         while True:
-            image = self.data_processor.get_latest_image()
-            scan_result = detector.scan(image, ["floor"], fast_check=True)
-            if scan_result["have_floor_edge"]:
+            label_image = detector.segment_image(self.data_processor.get_latest_image(), visual=False)
+            scan_result = detector.scan(label_image, ["pillar"])
+            if scan_result["have_pillar_edge"]:
                 if show_state:print("[Step 1] Floor detected, stop reversing.")
                 break
             if show_state:print("[Step 1] Still no floor, continue reversing.")
@@ -599,7 +606,8 @@ class Nav2Processing:
         forward_speed = 30.0
         rotate_speed = 8.0
         other_side_door_len = None
-
+        MIN_BOX_WIDTH = 100
+        MIN_BOX_HEIGHT = 100  
         if show_state:print("[Step 2] Start scanning for walls and doors...")
         while True:
             # Rotate until wall is seen
@@ -643,95 +651,182 @@ class Nav2Processing:
                 _, is_connect= lines_can_connect(door_groups, max_gap=100)
                 if show_state:print(f"[Door Check] Door groups connected? {is_connect}")
 
-                if is_connect:
-                    door_len = cal_door_len(door_groups)
-                    if show_state:print(f"[Door Check] Door length = {door_len}")
+                # if is_connect:
+                #     turn_side *= -1
+                #     continue
+                    # door_len = cal_door_len(door_groups)
+                    # if show_state:print(f"[Door Check] Door length = {door_len}")
 
-                    other_side_door_len = door_len if other_side_door_len is None else other_side_door_len
-                    if other_side_door_len < (door_len + 50) and door_len > 150:
-                        if show_state:print("[Door Check] New door larger, try turning other direction.")
-                        turn_side *= -1  # Try the other side
-                        continue
-                if show_state:print("[Door Check] Proceeding with current door.")
-                other_side_door_len = None
+                    # if other_side_door_len is None:
+                    #     other_side_door_len = door_len
+                    #     if show_state:print("[Door Check] First door length recorded. Checking further.")
+                    #     turn_side *= -1
+                    #     continue
 
-                # Align to furthest group
-                if show_state:print("[Align Furthest] Moving towards furthest pillar...")
-                while True:
-                    image = self.data_processor.get_latest_image()
-                    scan_result = detector.scan(image)
-                    self.ros_communicator.edge_image_publish(detector.edge_color_image)
-
-                    pillar_groups = group_parallel_lines(scan_result["pillar_edge"], spatial_eps=20, angle_eps=np.radians(10), min_samples=3)
-                    # door_groups = group_parallel_lines(scan_result["door_edge"], spatial_eps=20, angle_eps=np.radians(10), min_samples=3)
-                    if len(pillar_groups) > 0:
-                        target_pillar = get_further_edge_group(pillar_groups)
-                        target_center = detector.get_group_center(target_pillar["edges"])
-                    # elif len(door_groups) > 0:
-                    #     target_pillar = get_further_edge_group(door_groups)
-                    #     target_center = detector.get_group_center(target_pillar["edges"])
-                    else:
-                        break
-                        # yield [forward_speed]*4
-                    yield from self.align_to(target_center, image.shape[1] // 2, 25.0, 0.5, 10.0, 20)
-                    # if detector.classify_whole_image_by_ratio(image, 0.7)[0]:
+                    # if door_len < 150:
+                    #     if show_state:print("[Door Check] Current door is small (possible exit). Proceed.")
+                    #     other_side_door_len = None
                     #     break
+
+                    # if other_side_door_len > door_len + 50:
+                    #     if show_state:print("[Door Check] Found smaller door, proceed this direction.")
+                    #     other_side_door_len = None
+                    #     break
+                    # else:
+                    #     if show_state:print("[Door Check] Found larger door, switch direction.")
+                    #     turn_side *= -1
+                    #     continue
+
+                # if show_state:print("[Door Check] Proceeding with current door.")
+                # other_side_door_len = None
+                # else:
+                if not is_connect:
+                    # Align to furthest group
+                    if show_state:print("[Align Furthest] Moving towards furthest pillar...")
+                    while True:
+                        image = self.data_processor.get_latest_image()
+                        scan_result = detector.scan(image)
+                        self.ros_communicator.edge_image_publish(detector.edge_color_image)
+
+                        pillar_groups = group_parallel_lines(scan_result["pillar_edge"], spatial_eps=20, angle_eps=np.radians(10), min_samples=3)
+                        # door_groups = group_parallel_lines(scan_result["door_edge"], spatial_eps=20, angle_eps=np.radians(10), min_samples=3)
+                        if len(pillar_groups) > 0:
+                            target_pillar = get_further_edge_group(pillar_groups)
+                            target_center = detector.get_group_center(target_pillar["edges"])
+                        # elif len(door_groups) > 0:
+                        #     target_pillar = get_further_edge_group(door_groups)
+                        #     target_center = detector.get_group_center(target_pillar["edges"])
+                        else:
+                            break
+                            # yield [forward_speed]*4
+                        yield from self.align_to(target_center, image.shape[1] // 2, 25.0, 0.5, 10.0, 10)
+                        # if detector.classify_whole_image_by_ratio(image, 0.7)[0]:
+                        #     break
+
+                    # # Turn back to find pillars again
+                    # rotate_speed_ = rotate_speed*turn_side*-1
+                    # leave_pillar = False
+                    # while True:
+                    #     yield [-rotate_speed_, rotate_speed_, -rotate_speed_, rotate_speed_]
+                    #     image = self.data_processor.get_latest_image()
+                    #     scan_result = detector.scan(image, ["pillar"], fast_check=True)
+                    #     if scan_result["have_pillar_edge"]:
+                    #         if not leave_pillar: 
+                    #             if show_state:print("[Recovery] Still hugging pillar, continue turning.")
+                    #             is_detected, position = self.ros_communicator.detect_pikachu(image, (0, image.shape[1]))
+                    #             if is_detected:
+                    #                 if show_state:print("[Wall Search] Pikachu detected, aligning temporarily...")
+                    #                 yield from self.forward_and_align_until_pikachu_lost(forward_speed, 0.1, 0.5, 10.0)
+                    #             continue
+                    #         if show_state:print("[Recovery] Pillar detected, stop turning.")
+                    #         yield [0.0] * 4
+                    #         break
+                    #     else:
+                    #         leave_pillar = True
+
+                    # # Move forward slightly until view is mostly clear
+                    # if show_state:print("[Recovery] Moving forward to re-align...")
+                    # while True:
+                    #     yield [forward_speed]*4
+                    #     image = self.data_processor.get_latest_image()
+                    #     scan_result = detector.scan(image)
+                    #     if  not scan_result["have_floor_edge"]:
+                    #         if show_state:print("[Recovery] Floor occupies most of view. Done.")
+                    #         break
+                    # Back to look 
+                    while True:
+                        yield [backward_speed//2]*4 
+                        image = self.data_processor.get_latest_image()
+                        scan_result = detector.scan(image, ["pillar"])
+                        if scan_result["have_pillar_edge"]:
+                            if show_state:print("[Recovery] Floor occupies most of view. Done.")
+                            break
             # Not have break line than detect pillar wall combind 
-            elif detector.detect_pillar_wall_pair(image)[0]:
+            if detector.detect_pillar_wall_pair(image)[0]:
                 self.ros_communicator.edge_image_publish(detector.edge_color_image)
                 if show_state:print("[Exit Detection] Found pillar-wall pair (potential exit).")
                 lost_wall_time = 0
                 while True:
                     image = self.data_processor.get_latest_image()
                     scan_result = detector.scan(image)
-                    self.ros_communicator.edge_image_publish(detector.edge_color_image)
+                    wall_bounding_boxes = detector.get_class_bounding_boxes(image, target_class="wall")
+
+                    if len(wall_bounding_boxes) > 0 :
+                        if len(wall_bounding_boxes)>1: wall_bounding_boxes.sort(key=lambda b: b[0])
+                        if turn_side == 1:
+                            target_box = wall_bounding_boxes[-1] 
+                        else:
+                            target_box = wall_bounding_boxes[0] 
+                        if show_state:
+                            print(f"[Wall BBox] Selected box: (x={target_box[0]}, y={target_box[1]}, w={target_box[2]}, h={target_box[3]})")
+                            if target_box[2]*target_box[3] > 500: color = (0, 255, 255)
+                            else:color = (0, 0, 255)
+                            cv2.rectangle(detector.edge_color_image, (target_box[0], target_box[1]), (target_box[0] + target_box[2], target_box[1] + target_box[3]), color, 2)
+
+                            self.ros_communicator.edge_image_publish(detector.edge_color_image)
 
                     wall_groups = group_parallel_lines(scan_result["wall_edge"], spatial_eps=20, angle_eps=np.radians(10), min_samples=3)
                     pillar_groups = group_parallel_lines(scan_result["pillar_edge"], spatial_eps=20, angle_eps=np.radians(10), min_samples=3)
-                    if len(wall_groups) > 0:
-                        target_wall = get_further_edge_group(wall_groups)
-                        target_center = detector.get_group_center(target_wall["edges"])
+       
+                    extra_turn_error = 0.0
+                    if len(wall_bounding_boxes) > 0 and target_box[2] > MIN_BOX_WIDTH:
+                        target_center = (target_box[0] + target_box[2] // 2, target_box[1] + target_box[3] // 2)
+                        # if target_box[2] < MIN_BOX_WIDTH or target_box[3] < MIN_BOX_HEIGHT:
+                        #     error_ratio = 1.0 - (target_box[2] / MIN_BOX_WIDTH)
+                        #     extra_turn_error = error_ratio * -turn_side * 0.7
+                        #     if show_state: print(f"[Align Adjust] Small box detected (w={target_box[2]}, h={target_box[3]}), adding turn offset: {extra_turn_error:.2f}")
+                    # elif len(wall_groups) > 0:
+                    #     target_wall = get_further_edge_group(wall_groups)
+                    #     target_center = detector.get_group_center(target_wall["edges"])
                     elif len(pillar_groups) > 0:
                         target_pillar = get_further_edge_group(pillar_groups)
                         target_center = detector.get_group_center(target_pillar["edges"])
-                    else:
-                        # break
-                        yield [forward_speed]*4
 
                     # Combine angle alignment and center alignment
-                    if len(wall_groups) > 0:
-                        yield from self.align_to_with_orientation(
-                            target_center, wall_groups[0],image.shape[1] // 2, 
-                            base_speed=25.0,
-                            Kp_center=0.01, 
-                            Kp_angle=0.3, 
-                            max_turn=5.0, 
-                            center_th=10,
-                            weight_center=0.3,
-                            weight_angle=0.7)
-                    yield from self.align_to(
-                        target_center,image.shape[1] // 2, 25.0, 0.2, 10.0, 20)
-                    if len(wall_groups) ==0:
+                    if target_center:
+                        if len(wall_groups) > 0:
+                            yield from self.align_to_with_orientation(
+                                target_center, wall_groups[0] ,image.shape[1] // 2, 
+                                base_speed=25.0,
+                                Kp_center=0.1, 
+                                Kp_angle=0.3, 
+                                max_turn=10.0, 
+                                center_th=10,
+                                weight_center=0.7,
+                                weight_angle=0.3,
+                                extra_turn_error=extra_turn_error)
+                        else:
+                            yield from self.align_to(
+                                target_center, image.shape[1] // 2, 25.0, 0.2, 10.0, 20)
+                    else:
+                        yield [forward_speed]*4
+
+                    if len(wall_groups) == 0 and len(pillar_groups) == 0:
                         lost_wall_time += 1 
-                    if lost_wall_time >15 and detector.classify_whole_image_by_ratio(image,0.9)[0]:
+                    if len(wall_groups) == 0 and len(pillar_groups) == 0 and detector.classify_whole_image_by_ratio(image,0.8)[0]:
                         if show_state:print("[Exit Align] Detected mostly floor (exit). Break alignment.")
                         break
 
                 # Turn back to find pillars again
                 rotate_speed_ = rotate_speed*turn_side*-1
+                leave_pillar = False
                 while True:
                     yield [-rotate_speed_, rotate_speed_, -rotate_speed_, rotate_speed_]
                     image = self.data_processor.get_latest_image()
                     scan_result = detector.scan(image, ["pillar"], fast_check=True)
                     if scan_result["have_pillar_edge"]:
-                        if not leave_wall: 
-                            if show_state:print("[Recovery] Still hugging wall, continue turning.")
+                        if not leave_pillar: 
+                            if show_state:print("[Recovery] Still hugging pillar, continue turning.")
                             continue
                         if show_state:print("[Recovery] Pillar detected, stop turning.")
                         yield [0.0] * 4
                         break
                     else:
-                        leave_wall = True
+                        is_detected, position = self.ros_communicator.detect_pikachu(image, (0, image.shape[1]))
+                        if is_detected:
+                            if show_state:print("[Wall Search] Pikachu detected, aligning temporarily...")
+                            yield from self.forward_and_align_until_pikachu_lost(forward_speed, 0.1, 0.5, 10.0)
+                        leave_pillar = True
 
                 # Move forward slightly until view is mostly clear
                 if show_state:print("[Recovery] Moving forward to re-align...")
@@ -751,6 +846,8 @@ class Nav2Processing:
                 #         if show_state:print("[Recovery] Floor occupies most of view. Done.")
                 #         break
             # self.ros_communicator.edge_image_publish(detector.segment_image(image))
+            self.ros_communicator.edge_image_publish(detector.edge_color_image)
+
             turn_side = turn_side * -1
 
     def stop_nav(self):

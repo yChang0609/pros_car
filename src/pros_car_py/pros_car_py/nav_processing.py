@@ -431,23 +431,48 @@ class Nav2Processing:
         yield from self.forward_and_align_until_pikachu_lost(forward_speed, 0.1, 0.5, 10.0)
 
     def random_living_room_nav(self):
-        print(f"\n")    
-        start = time.clock() 
-        rotate_speed = 8.0
+        print(f"\n") 
+        rotate_speed = 4.0
         forward_speed = 15.0
-        show_state = True
+        arrive = False
+
         while True:
             image = self.data_processor.get_latest_image()
-            is_detected, position = self.ros_communicator.detect_pikachu(image, (0, image.shape[1]))
-            if is_detected or (time.clock() - start)> 5:
-                if show_state:print("[Wall Search] Pikachu detected, aligning temporarily...")
-        
-                break
-            yield [-rotate_speed, rotate_speed, -rotate_speed, rotate_speed]
+            if image is None:
+                continue
+            detections = self.ros_communicator.living_room_detect(image, (0, image.shape[1]))
+            has_pikachu = False
+            has_large_cabinet = False
 
-        yield from self.forward_and_align_until_pikachu_lost(forward_speed, 0.1, 0.5, 10.0)
+            print(detections)
+            for det in detections:
+                name = det["name"].lower()
+                bbox = det["bbox"]
+                center = (det["center"]["x"], det["center"]["y"])
+                width = bbox["x2"] - bbox["x1"]
+                image_width = image.shape[1]
+                if name == "pickachu":
+                    has_pikachu = True
+                    break 
+                elif name == "cabinet" and not arrive:
+                    if width <= 0.35 * image_width:
+                        has_large_cabinet = True
+                    else:
+                        arrive = True
+                    
 
-    def random_living_room_nav(self):
+            if has_pikachu:
+                print("Found Pikachu! Moving forward...")
+                yield from self.forward_and_align_until_pikachu_lost(forward_speed, 0.1, 0.5, 10.0)   
+            elif has_large_cabinet:
+                print("Large cabinet detected. Turning to find Pikachu...")
+                yield from self.align_to(center, image.shape[1] // 2, 25.0, 0.05, 6.0, 10, ratio=1.0)
+            else:
+                print("Nothing detected. Rotating...")
+                yield [-rotate_speed, rotate_speed, -rotate_speed, rotate_speed]
+   
+
+    def random_living_room_nav_hard(self):
         # === Configurable Parameters ===
         map_path = "/workspaces/src/pros_car_py/config/living_room"
         G_A = 0.0

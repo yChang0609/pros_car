@@ -38,7 +38,8 @@ from pros_car_py.ros_communicator_config import ACTION_MAPPINGS     # Custom-def
 
 # ========== Custom Interface Messages ==========
 from interfaces_pkg.msg import ArucoMarkerConfig, ArucoMarker  # Marker configuration and detection messages
-from interfaces_pkg.srv import PikachuDetect
+from interfaces_pkg.srv import PikachuDetect, LivingRoomDetect
+from interfaces_pkg.msg import ObjectDetection 
 
 class RosCommunicator(Node):
     def __init__(self):
@@ -202,6 +203,7 @@ class RosCommunicator(Node):
         
         # >> YOLO service
         self.yolo_detect_client = self.create_client(PikachuDetect, 'detect_pikachu')
+        self.living_room_detect_client = self.create_client(LivingRoomDetect, 'living_room_detect')
 
 
 
@@ -495,6 +497,46 @@ class RosCommunicator(Node):
         req.image = crop_msg
         future = self.yolo_detect_client.call(req)
         return future.detected, future.position
+    
+    def living_room_detect(self, image, crop: tuple):
+        crop_l, crop_r = crop
+        crop_img = image[:, crop_l:crop_r]
+
+        crop_msg = self.bridge.cv2_to_imgmsg(crop_img, encoding="bgr8")
+
+        req = LivingRoomDetect.Request()
+        req.image = crop_msg
+
+        future = self.living_room_detect_client.call(req)
+
+
+        detections = []
+        for obj in future.detections:
+            cx = obj.center.x + crop_l  # 補上 crop 偏移
+            cy = obj.center.y
+            w = obj.width
+            h = obj.height
+
+            x1 = cx - w / 2
+            y1 = cy - h / 2
+            x2 = cx + w / 2
+            y2 = cy + h / 2
+
+            det = {
+                "name": obj.name,
+                "center": {
+                    "x": cx,
+                    "y": cy
+                },
+                "bbox": {
+                    "x1": x1,
+                    "y1": y1,
+                    "x2": x2,
+                    "y2": y2
+                }
+            }
+            detections.append(det)
+        return detections
     
     def subscriber_image_callback(self, msg):
         self.latest_image_msg =msg

@@ -209,11 +209,27 @@ class CarController:
                     except StopIteration:
                         self.action_gen = None
                         action_key = "STOP"
+                        
+            elif mode == "fix_living_room_nav":
+                if self.action_gen:
+                    try:
+                        action_key = next(self.action_gen)
+                    except StopIteration:
+                        action_key = "STOP"
+                        self.action_gen = None
+                else:
+                    self.nav_processing.reset_nav_process()
+                    self.action_gen = self.nav_processing.fix_living_room_nav()
+                    try:
+                        action_key = next(self.action_gen)
+                    except StopIteration:
+                        self.action_gen = None
+                        action_key = "STOP"
 
             if self._thread_running == False:
                 action_key = "STOP"
             # print(action_key)
-            time.sleep(0.01)
+            time.sleep(0.005)
             self.ros_communicator.publish_car_control(
                 action_key, publish_rear=True, publish_front=True
             )

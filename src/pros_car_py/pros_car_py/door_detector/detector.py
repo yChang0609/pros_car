@@ -4,8 +4,34 @@ import numpy as np
 import random
 import math
 from sklearn.cluster import DBSCAN
+from scipy.spatial import KDTree
 from concurrent.futures import ThreadPoolExecutor
-import time
+from collections import Counter
+from scipy.ndimage import convolve
+
+KERNEL = np.array([[1,1,1],
+                    [1,0,1],
+                    [1,1,1]])
+
+class UnionFind:
+    def __init__(self):
+        self.parent = dict()
+
+    def find(self, x):
+        if x not in self.parent:
+            self.parent[x] = x
+        while self.parent[x] != x:
+            self.parent[x] = self.parent[self.parent[x]]  # 路徑壓縮
+            x = self.parent[x]
+        return x
+
+    def union(self, x, y):
+        self.parent[self.find(x)] = self.find(y)
+
+def get_label_edges(label_map):
+    neighbor_sum = convolve(label_map, KERNEL, mode='constant', cval=0)
+    edge_mask = (neighbor_sum != label_map * np.sum(KERNEL))
+    return edge_mask.astype(np.uint8) * 255
 
 def hsv_to_circular_cartesian(hsv):
     h, s, v = hsv[:, 0], hsv[:, 1] / 255.0, hsv[:, 2] / 255.0
@@ -84,6 +110,182 @@ def group_parallel_lines(edges, spatial_eps=20, angle_eps=np.radians(10), min_sa
         groups.append(group)
 
     return groups
+
+def check_connect_by_points_fast(group1, group2, max_gap=100):
+    points1 = [e["start"] for e in group1["edges"]] + [e["end"] for e in group1["edges"]]
+    points2 = [e["start"] for e in group2["edges"]] + [e["end"] for e in group2["edges"]]
+
+    pts1 = np.array(points1)
+    pts2 = np.array(points2)
+
+    dists = np.linalg.norm(pts1[:, None, :] - pts2[None, :, :], axis=2)  # shape: (len(pts1), len(pts2))
+    return np.any(dists < max_gap)
+
+def check_connect_by_kdtree(group1, group2, max_gap=10): 
+    points1 = [np.array(e["start"], dtype=np.float32) for e in group1["edges"]] + \
+              [np.array(e["end"], dtype=np.float32) for e in group1["edges"]]
+    points2 = [np.array(e["start"], dtype=np.float32) for e in group2["edges"]] + \
+              [np.array(e["end"], dtype=np.float32) for e in group2["edges"]]
+
+    if not points1 or not points2:
+        return False
+
+    tree = KDTree(points2)
+    for p in points1:
+        dist, _ = tree.query(p, k=1)
+        if dist < max_gap:
+            return True
+
+    return False
+
+def check_connect(group1, group2, max_gap=100, angle_thresh=np.radians(5)):
+    params1, angle1 = fit_line(group1)
+    params2, angle2 = fit_line(group2)
+    if params1 is None or params2 is None:
+        return False
+
+    angle_diff = abs(angle1 - angle2)
+    if angle_diff > np.pi / 2:
+        angle_diff = np.pi - angle_diff
+    if angle_diff > angle_thresh:
+        return False
+
+    x0_1, y0_1 = params1[0], params1[1]
+    vx2, vy2 = params2[2], params2[3]
+    x0_2, y0_2 = params2[0], params2[1]
+    line_vec = np.array([vx2, vy2]).flatten()
+    point_vec = np.array([x0_1 - x0_2, y0_1 - y0_2]).flatten()
+    proj_len = np.abs(np.cross(line_vec, point_vec)) / np.linalg.norm(line_vec)
+
+    return proj_len < max_gap
+
+def fit_line(group):
+    """Fit a line y = ax + b to the group edges, return (a, b) and direction angle."""
+    points = []
+    for edge in group["edges"]:
+        points.extend([edge["start"], edge["end"]])
+    
+    if len(points) < 2:
+        return None, None
+    
+    pts = np.array(points)
+    [vx, vy, x0, y0] = cv2.fitLine(pts.astype(np.float32), cv2.DIST_L2, 0, 0.01, 0.01)
+    direction = np.arctan2(vy, vx)  # radians
+
+    return (x0, y0, vx, vy), direction
+
+def group_connected_door_groups(door_groups, pillar_groups, max_gap=10):
+    uf = UnionFind()
+
+    n = len(door_groups)
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            g1 = door_groups[i]
+            g2 = door_groups[j]
+
+            # 如果 g1 和 g2 可以直接或透過 pillar 連通，就 union 起來
+            if check_connect_by_kdtree(g1, g2, max_gap=max_gap):
+                uf.union(id(g1), id(g2))
+            else:
+                for pillar in pillar_groups:
+                    if check_connect_by_kdtree(g1, pillar, max_gap=max_gap) and \
+                       check_connect_by_kdtree(pillar, g2, max_gap=max_gap):
+                        uf.union(id(g1), id(g2))
+                        break
+
+    # 根據 union 結果，整理群組
+    group_map = dict()  # root_id -> list of groups
+    for g in door_groups:
+        root = uf.find(id(g))
+        if root not in group_map:
+            group_map[root] = []
+        group_map[root].append(g)
+
+    # 將每個群組合併為新的 super group
+    merged_groups = []
+    for group_list in group_map.values():
+        merged = {
+            "edges": [],
+            "edge_ids": []
+        }
+        for g in group_list:
+            merged["edges"].extend(g["edges"])
+            merged["edge_ids"].extend(g["edge_ids"])
+        merged_groups.append(merged)
+
+    return merged_groups
+
+def door_groups_connect_via_pillar(door_groups, pillar_groups, max_gap=10):
+    unconnectable_pairs = []
+    unconnectable_groups = set()
+    door_groups = group_connected_door_groups(door_groups, pillar_groups, max_gap=5)
+    for i in range(len(door_groups)):
+        for j in range(i + 1, len(door_groups)):
+            g1 = door_groups[i]
+            g2 = door_groups[j]
+
+            if check_connect_by_kdtree(g1, g2, max_gap=max_gap):
+                continue  
+
+            bridged = False
+            for pillar in pillar_groups:
+                if check_connect_by_kdtree(g1, pillar, max_gap=max_gap) and \
+                   check_connect_by_kdtree(pillar, g2, max_gap=max_gap):
+                    bridged = True
+                    break
+
+            if not bridged:
+                unconnectable_pairs.append((g1, g2))  
+
+    for g1, g2 in unconnectable_pairs:
+        unconnectable_groups.add(id(g1))
+        unconnectable_groups.add(id(g2))
+
+    result_groups = [g for g in door_groups if id(g) in unconnectable_groups]
+    all_connected = len(result_groups) == 0
+    return result_groups, all_connected
+
+def lines_can_connect_fast(groups, max_gap=100, angle_thresh=np.radians(5)):
+    line_params = []
+    for group in groups:
+        params, angle = fit_line(group)
+        line_params.append((params, angle))
+        
+    unconnectable_groups = []
+    for i in range(len(groups)):
+        connectable = False
+        for j in range(len(groups)):
+            if i == j:
+                continue
+            (p1, angle1), (p2, angle2) = line_params[i], line_params[j]
+            if p1 is None or p2 is None:
+                continue
+
+            angle_diff = abs(angle1 - angle2)
+            if angle_diff > np.pi / 2:
+                angle_diff = np.pi - angle_diff
+
+            if angle_diff > angle_thresh:
+                continue  # not parallel enough
+
+            # Compute distance from line1 point to line2 line
+            x0_1, y0_1 = p1[0], p1[1]
+            vx2, vy2 = p2[2], p2[3]
+            x0_2, y0_2 = p2[0], p2[1]
+            line_vec = np.array([vx2, vy2]).flatten()
+            point_vec = np.array([x0_1 - x0_2, y0_1 - y0_2]).flatten()
+
+            proj_len = np.abs(np.cross(line_vec, point_vec)) / np.linalg.norm(line_vec)
+
+            if proj_len < max_gap:
+                connectable = True
+                break
+
+        if not connectable:
+            unconnectable_groups.append(groups[i])
+    return unconnectable_groups, len(unconnectable_groups) == 0
+
 def lines_can_connect(groups, max_gap=100):
     unconnectable_groups = []
     for i in range(len(groups)):
@@ -106,17 +308,25 @@ def lines_connect_test(g1, g2, max_gap=80):
         np.linalg.norm(np.array(p1) - np.array(p2))
         for p1 in g1_points for p2 in g2_points
     )
-    print(f"{min_dist} < {max_gap}:{min_dist < max_gap}")
+    # print(f"{min_dist} < {max_gap}:{min_dist < max_gap}")
     return min_dist < max_gap
 
-def get_further_edge_group(groups):
-    def avg_y(group):
-        return np.mean([pt[1] for g in group["edges"] for pt in [g["start"], g["end"]]])
-    if len(groups) > 0:
-        return min(groups, key=avg_y)
-    else:
+def get_further_edge_group(groups, turn_side=0):
+    if not groups:
         return None
 
+    def avg_xy(group):
+        xs = [pt[0] for e in group["edges"] for pt in [e["start"], e["end"]]]
+        ys = [pt[1] for e in group["edges"] for pt in [e["start"], e["end"]]]
+        return np.mean(xs), np.mean(ys)
+
+    if turn_side == 1:
+        return max(groups, key=lambda g: (avg_xy(g)[0], -avg_xy(g)[1]))
+    elif turn_side == -1:
+        return min(groups, key=lambda g: (avg_xy(g)[0], -avg_xy(g)[1]))
+    else:
+        return min(groups, key=lambda g: avg_xy(g)[1])
+    
 def get_avg_color(img, x, y, dx, dy, side=1, size=3):
     h, w, _ = img.shape
     half = size // 2
@@ -160,25 +370,27 @@ def draw_clusters(image, all_grouped_edges_dict):
                 x0, y0 = map(int, edge["start"])
                 x1, y1 = map(int, edge["end"])
                 cv2.line(vis, (x0, y0), (x1, y1), color, 2)
-                cx = int((x0 + x1) / 2)
-                cy = int((y0 + y1) / 2)
-                cv2.putText(vis, f"{key[0]}{cluster_idx}", (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+                # cx = int((x0 + x1) / 2)
+                # cy = int((y0 + y1) / 2)
+                # cv2.putText(vis, f"{key[0]}{cluster_idx}", (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
 
     return vis
 
-def process_patch_with_coords(image, x0, y0, x1, y1):
-    patch = image[y0:y1, x0:x1]
-    gray = cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(gray, 50, 150)
-    dx = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
-    dy = cv2.Sobel(gray, cv2.CV_64F, 0, 1)
-
+def process_patch_with_coords(label_image, x0, y0, x1, y1):
+    patch = label_image[y0:y1, x0:x1].astype(np.uint8)
+    # edges = cv2.Canny(patch, threshold1=0, threshold2=255)
+    edges = convolve(patch, KERNEL, mode='constant', cval=0)
+    edge_mask = (edges != patch * np.sum(KERNEL))
+    edge_mask = edge_mask.astype(np.uint8) * 255
+    dx = cv2.Sobel(patch, cv2.CV_64F, 1, 0)
+    dy = cv2.Sobel(patch, cv2.CV_64F, 0, 1)
     return {
         "region": (x0, y0, x1, y1),
-        "edges": edges,
+        "edges": edge_mask,
         "dx": dx,
         "dy": dy
     }
+
 
 def get_weighted_avg_hsv_patch(hsv_image, x, y, nx, ny, side=30, patch_size=5):
     px = int(round(x + nx * side))
@@ -204,25 +416,27 @@ def get_weighted_avg_hsv_patch(hsv_image, x, y, nx, ny, side=30, patch_size=5):
     return np.array([weighted_h, weighted_s, weighted_v])
 
 class DoorDetector:
-    def __init__(self):
+    def __init__(self, trapezoid_pts):
         self.cluster_centers = np.load("/workspaces/src/pros_car_py/kmeans_models/kmeans_centers.npy")
         # print(self.cluster_centers)
         self.label_map = {
-            0: "pillar",
-            1: "wall",
-            2: "floor",
-            3: "door",
+            0: "door",
+            1: "floor",
+            2: "pillar",
+            3: "wall",
             4: "other",
         }
+        self.label_to_id = {v: k for k, v in self.label_map.items()}
+        self.trapezoid_pts = np.array(trapezoid_pts, dtype=np.int32)  
         self.executor = ThreadPoolExecutor(max_workers=8) 
     def __del__(self):
         self.executor.shutdown()
         
-    def scan(self, image, detect_target=None, fast_check=False):
+    def scan(self, label_image, detect_target=None, fast_check=False, vis_image=None):
         if fast_check:  
-            return self.fast_object_check(image, detect_target)
+            return self.fast_object_check(label_image, detect_target)
         
-        edges, self.edge_color_image = self.process_image(image)
+        edges = self.process_image(label_image, vis_image)
         
         results = {}
 
@@ -236,6 +450,14 @@ class DoorDetector:
         results["have_floor_edge"] = len(edges["pillar_edge"]) > 0 or len(edges["wall_edge"]) > 0 or len(edges["door_edge"]) > 0
 
         return results
+    
+    def classify_label_from_map(self, label_image, x, y, nx, ny, side):
+        px = int(round(x + nx * side))
+        py = int(round(y + ny * side))
+        h, w = label_image.shape
+        if 0 <= px < w and 0 <= py < h:
+            return self.label_map.get(label_image[py, px], "unknown")
+        return "unknown"
     
     def classify_color(self, color):
         diffs = self.cluster_centers - color  # shape: (K, 3)
@@ -259,28 +481,25 @@ class DoorDetector:
         label = self.label_map[self.classify_color(hsv)]
         return label
 
-    def classify_whole_image_by_ratio(self, image, threshold=0.8):
+    def classify_whole_image_by_ratio(self, label_image, threshold=0.8):
+        h, w = label_image.shape
+        total_pixels = h * w
 
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        h, w, _ = hsv.shape
-        reshaped = hsv.reshape(-1, 3)
+        unique, counts = np.unique(label_image, return_counts=True)
+        label_ratios = {}
 
-        distances = np.linalg.norm(self.cluster_centers - reshaped[:, None], axis=2)
-        pred_indices = np.argmin(distances, axis=1)
+        for label_idx, count in zip(unique, counts):
+            name = self.label_map.get(label_idx, "unknown")
+            label_ratios[name] = count / total_pixels
 
-        unique, counts = np.unique(pred_indices, return_counts=True)
-        total = h * w
-
-        label_ratios = {self.label_map[int(k)]: v / total for k, v in zip(unique, counts)}
-
-        for label, ratio in label_ratios.items():
-            # print(f"{label}:{ratio}")
+        for name, ratio in label_ratios.items():
             if ratio >= threshold:
-                return True, label, ratio 
+                return True, name, ratio
+
         return False, None, label_ratios
-    
-    def slice_and_process_parallel(self, image, patch_size=200, y_start=100, max_workers=4):
-        h, w = image.shape[:2]
+        
+    def slice_and_process_parallel(self, label_image, patch_size=200, y_start=100):
+        h, w = label_image.shape[:2]
         tasks = []
         for y0 in range(y_start, h, patch_size//2):
             y1 = min(y0 + patch_size, h)
@@ -288,24 +507,22 @@ class DoorDetector:
                 x1 = min(x0 + patch_size, w)
                 tasks.append((x0, y0, x1, y1))
 
-        return list(self.executor.map(lambda args: process_patch_with_coords(image, *args), tasks))
+        return list(self.executor.map(lambda args: process_patch_with_coords(label_image, *args), tasks))
     
-    def fast_object_check(self, image, detect_target, threshold=0.01):
+    def fast_object_check(self, label_image, detect_target, threshold=0.01):
         if detect_target is None:
             detect_target = ["floor", "door", "pillar", "wall"]
 
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        h, w, _ = hsv.shape
+        label_cropped = label_image[100:, :]
+        h, w = label_cropped.shape
 
-        masked_hsv = hsv[100:, :, :] 
-        reshaped = masked_hsv.reshape(-1, 3)
+        unique, counts = np.unique(label_cropped, return_counts=True)
+        total_pixels = h * w
 
-        dists = np.linalg.norm(self.cluster_centers - reshaped[:, None], axis=2)
-        pred_indices = np.argmin(dists, axis=1)
-
-        unique, counts = np.unique(pred_indices, return_counts=True)
-        total_pixels = reshaped.shape[0]
-        label_ratios = {self.label_map[int(k)]: v / total_pixels for k, v in zip(unique, counts)}
+        label_ratios = {}
+        for k, v in zip(unique, counts):
+            class_name = self.label_map.get(int(k), "unknown")
+            label_ratios[class_name] = v / total_pixels
 
         result = {}
         for label in detect_target:
@@ -314,10 +531,9 @@ class DoorDetector:
 
         return result
 
-    def process_image(self, image):
-        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        edge_color_image = image.copy()
-        patches = self.slice_and_process_parallel(image, y_start=60)
+    def process_image(self, label_image, vis_image=None, ):
+        # edge_color_image = np.stack([label_image]*3, axis=-1)  # Convert to color for visualization
+        patches = self.slice_and_process_parallel(label_image, y_start=80)
 
         results = {
             "door_edge": {},
@@ -330,16 +546,16 @@ class DoorDetector:
             edges = patch["edges"]
             dx = patch["dx"]
             dy = patch["dy"]
-
+            
             ys, xs = np.where(edges == 255)
-            xs = xs[::4]
-            ys = ys[::4]
+            # xs = xs[::4]
+            # ys = ys[::4]
             for x, y in zip(xs, ys):
                 gx = dx[y, x]
                 gy = dy[y, x]
-
                 angle = np.abs(np.arctan2(gy, gx) * 180.0 / np.pi)
-                if angle < 20 or angle > 100:
+
+                if angle < 10 or angle > 170:
                     continue
 
                 norm = np.sqrt(gx ** 2 + gy ** 2)
@@ -352,24 +568,48 @@ class DoorDetector:
                 global_x = x0 + x
                 global_y = y0 + y
                 all_points.append((global_x, global_y, nx, ny))
-        def process_point(idx, x, y, nx, ny):
-            label1 = self.classify_avg_hsv(hsv_image, x, y, nx, ny, side=30)
-            label2 = self.classify_avg_hsv(hsv_image, x, y, nx, ny, side=-30)
-            labels = [label1, label2]
 
-            if "floor" in labels:
-                edge_id = f"edge_{idx}"
-                edge_color_image[y, x] = (255, 0, 255)
-                if "door" in labels:
-                    edge_color_image[y, x] = (255, 0, 0)
+        def process_point(idx, x, y, nx, ny):
+            h, w = label_image.shape
+            num_samples = 30
+            max_distance = 5 
+
+            all_labels = []
+
+            for _ in range(num_samples):
+                dist = random.randint(1, max_distance)
+
+                px1, py1 = x + nx * dist, y + ny * dist
+                if 0 <= py1 < h and 0 <= px1 < w:
+                    all_labels.append(label_image[py1, px1])
+
+                px2, py2 = x - nx * dist, y - ny * dist
+                if 0 <= py2 < h and 0 <= px2 < w:
+                    all_labels.append(label_image[py2, px2])
+
+            if not all_labels:
+                return None
+
+            counter = Counter(all_labels)
+            most_common = counter.most_common(2)
+            label_names = [self.label_map.get(label, None) for label, _ in most_common]
+
+            label_pair = set(label_names)
+            edge_id = f"edge_{idx}"
+            if "floor" in label_pair:
+                if vis_image is not None: vis_image[y, x] = (255, 0, 255)
+                if "door" in label_pair:
+                    if vis_image is not None: vis_image[y, x] = (255, 0, 0)
                     return ("door_edge", edge_id, x, y, nx, ny)
-                elif "wall" in labels:
-                    edge_color_image[y, x] = (0, 0, 255)
+                elif "wall" in label_pair:
+                    if vis_image is not None: vis_image[y, x] = (0, 0, 255)
                     return ("wall_edge", edge_id, x, y, nx, ny)
-                elif "pillar" in labels:
-                    edge_color_image[y, x] = (0, 255, 0)
+                elif "pillar" in label_pair:
+                    if vis_image is not None: vis_image[y, x] = (0, 255, 0)
                     return ("pillar_edge", edge_id, x, y, nx, ny)
+
             return None
+        
         futures = [
             self.executor.submit(process_point, idx, x, y, nx, ny)
             for idx, (x, y, nx, ny) in enumerate(all_points)
@@ -379,20 +619,16 @@ class DoorDetector:
             if result:
                 key, edge_id, x, y, nx, ny = result
                 results[key][edge_id] = {"start": (x - nx, y - ny), "end": (x + nx, y + ny)}
-        return results, edge_color_image
+
+        return results
+
     
-    def detect_pillar_wall_pair(self, image):
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        edges = cv2.Canny(gray, 50, 150)
-        dx = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
-        dy = cv2.Sobel(gray, cv2.CV_64F, 0, 1)
-
-        edge_color_image = image.copy()
+    def detect_pillar_wall_pair(self, label_image, vis_image=None):
+        h, w= label_image.shape
+        edges = get_label_edges(label_image)
         ys, xs = np.where(edges == 255)
-
-        pillar_lower = np.array([0, 0, 200])
-        pillar_upper = np.array([180, 15, 255])
+        dx = cv2.Sobel(label_image.astype(np.uint8), cv2.CV_64F, 1, 0)
+        dy = cv2.Sobel(label_image.astype(np.uint8), cv2.CV_64F, 0, 1)
 
         all_points = [(x, y) for x, y in zip(xs, ys) if y > 100]
         def process_point(x, y):
@@ -405,36 +641,45 @@ class DoorDetector:
             angle = np.degrees(np.abs(np.arctan2(gy, gx)))
             if not(angle < 30 or angle > 150):
                 return None
-
+            
             nx = int(round(gx / norm))
             ny = int(round(gy / norm))
 
+            num_samples = 30
+            max_distance = 30
+            all_labels = []
 
-            hsv1 = get_weighted_avg_hsv_patch(hsv, x, y, nx, ny, side=30)
-            hsv2 = get_weighted_avg_hsv_patch(hsv, x, y, nx, ny, side=-30)
+            for _ in range(num_samples):
+                dist = random.randint(1, max_distance)
 
-            if hsv1 is None or hsv2 is None:
+                px1, py1 = x + nx * dist, y + ny * dist
+                if 0 <= py1 < h and 0 <= px1 < w:
+                    all_labels.append(label_image[py1, px1])
+
+                px2, py2 = x - nx * dist, y - ny * dist
+                if 0 <= py2 < h and 0 <= px2 < w:
+                    all_labels.append(label_image[py2, px2])
+
+            if not all_labels:
                 return None
             
-            is_pillar1 = np.all(pillar_lower <= hsv1) and np.all(hsv1 <= pillar_upper)
-            is_pillar2 = np.all(pillar_lower <= hsv2) and np.all(hsv2 <= pillar_upper)
+            counter = Counter(all_labels)
+            most_common = counter.most_common(2)
+            label_names = [self.label_map.get(label, None) for label, _ in most_common]
 
-            label1 = self.label_map[self.classify_color(hsv1)] if not is_pillar1 else "pillar"
-            label2 = self.label_map[self.classify_color(hsv2)] if not is_pillar2 else "pillar"
-            cv2.circle(edge_color_image, (x,y), 3, (255,0,0), 1)
-            if {label1, label2} == {"pillar", "wall"}:
-                return (True, (x, y))
+            label_pair = set(label_names)
+            if vis_image is not None:vis_image[y, x] = (0, 255, 255)
+            if "pillar" in label_pair and "wall" in label_pair:
+                return True, (x, y)
             return None
 
         futures = [
             self.executor.submit(process_point, x, y)
             for x, y in all_points
         ]
-        count = 0
         for future in futures:
             res = future.result()
             if res:
-                self.edge_color_image = edge_color_image
                 return True, res[1]
 
         return False, None
@@ -460,10 +705,9 @@ class DoorDetector:
         pred_indices = np.argmin(dists, axis=1)
 
         # # 3. Optional: mask out bad matches (too far from any cluster center)
-        threshold = 1.0  
-        pred_indices[min_dists > threshold] = -1
-        pred_labels = pred_indices.reshape(h_img, w_img)
 
+        # pred_indices[min_dists > 0.105] = -1
+        pred_labels = pred_indices.reshape(h_img, w_img)
         if not visual:
             return pred_labels  
         
@@ -488,14 +732,8 @@ class DoorDetector:
         # seg_img[pillar_mask > 0] = color_map["pillar"]
 
         return seg_img
-    def get_class_bounding_boxes(self, image, target_class="wall", min_area=100):
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        h, w, _ = hsv.shape
-        reshaped = hsv.reshape(-1, 3)
-
-        dists = np.linalg.norm(self.cluster_centers - reshaped[:, None], axis=2)
-        pred_indices = np.argmin(dists, axis=1)
-        pred_labels = pred_indices.reshape(h, w)
+    def get_class_bounding_boxes(self, label_image, target_class="wall", min_area=100):
+        h, w = label_image.shape
 
         target_label_idx = None
         for idx, name in self.label_map.items():
@@ -504,12 +742,12 @@ class DoorDetector:
                 break
 
         if target_label_idx is None:
-            print(f"[Error] Class '{target_class}' not found.")
+            print(f"[Error] Class '{target_class}' not found in label_map.")
             return []
 
         # Create binary mask for the class
-        mask = (pred_labels == target_label_idx).astype(np.uint8)
-        mask[:100, :] = 0 
+        mask = (label_image == target_label_idx).astype(np.uint8)
+        mask[:100, :] = 0  # remove upper part
         binary_mask = mask * 255
 
         # Find contours (connected components)
@@ -522,3 +760,42 @@ class DoorDetector:
                 bounding_boxes.append((x, y, bw, bh))
 
         return bounding_boxes
+    
+    def safety_detect(self, label_image, vis_image=None, avoid_target="pillar"):
+        avoid_id = self.label_to_id[avoid_target]
+
+        mask = np.zeros_like(label_image, dtype=np.uint8)
+        cv2.fillPoly(mask, [self.trapezoid_pts], 1)
+        roi_mask = (mask == 1)
+
+        avoid_mask = ((label_image == avoid_id) & roi_mask).astype(np.uint8)
+
+        if vis_image is not None:
+            cv2.polylines(
+                vis_image,
+                [self.trapezoid_pts.astype(np.int32)],
+                isClosed=True,
+                color=(255, 0, 255),
+                thickness=2
+            )
+            overlay = vis_image.copy()
+            overlay[roi_mask] = (
+                overlay[roi_mask] * 0.5 + np.array([255, 200, 200]) * 0.5
+            ).astype(np.uint8)
+            vis_image[:] = overlay
+
+        if not np.any(avoid_mask):
+            return []  
+
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(avoid_mask, connectivity=8)
+
+        obstacle_centers = []
+
+        for i in range(1, num_labels):
+            cx, cy = centroids[i]
+            obstacle_centers.append((int(cx), int(cy)))
+
+            if vis_image is not None:
+                cv2.circle(vis_image, (int(cx), int(cy)), 5, (0, 0, 255), -1)
+                
+        return  obstacle_centers
